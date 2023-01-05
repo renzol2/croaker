@@ -1,5 +1,7 @@
 # Gritz
 
+Waveshape and bitcrushing distortion, for gritty goodness.
+
 ## Building
 
 After installing [Rust](https://rustup.rs/), you can compile Gritz as follows:
