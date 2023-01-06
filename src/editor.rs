@@ -19,7 +19,7 @@ impl Model for Data {}
 
 // Makes sense to also define this here, makes it a bit easier to keep track of
 pub(crate) fn default_state() -> Arc<ViziaState> {
-    ViziaState::from_size(200, 150)
+    ViziaState::from_size(300, 250)
 }
 
 pub(crate) fn create(
@@ -42,7 +42,7 @@ pub(crate) fn create(
         VStack::new(cx, |cx| {
             Label::new(cx, "Gritz")
                 .font(assets::NOTO_SANS_THIN)
-                .font_size(30.0)
+                .font_size(20.0)
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0))
                 .child_bottom(Pixels(0.0));
@@ -52,6 +52,9 @@ pub(crate) fn create(
             Label::new(cx, "Gain").bottom(Pixels(-1.0));
             ParamSlider::new(cx, Data::params, |params| &params.gain);
 
+            Label::new(cx, "Saturation").bottom(Pixels(-1.0));
+            ParamSlider::new(cx, Data::params, |params| &params.saturation);
+
             PeakMeter::new(
                 cx,
                 Data::peak_meter
@@ -59,7 +62,8 @@ pub(crate) fn create(
                 Some(Duration::from_millis(600)),
             )
             // This is how adding padding works in vizia
-            .top(Pixels(10.0));
+            .top(Pixels(10.0))
+            .bottom(Pixels(10.0));
         })
         .row_between(Pixels(0.0))
         .child_left(Stretch(1.0))

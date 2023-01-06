@@ -31,6 +31,9 @@ struct GritzParams {
 
     #[id = "gain"]
     pub gain: FloatParam,
+
+    #[id = "saturation"]
+    pub saturation: FloatParam,
 }
 
 impl Default for Gritz {
@@ -62,6 +65,14 @@ impl Default for GritzParams {
             .with_unit(" dB")
             .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
             .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+
+            saturation: FloatParam::new(
+                "Saturation",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.999 },
+            )
+            .with_smoother(SmoothingStyle::Linear(50.0))
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
         }
     }
 }
@@ -124,7 +135,13 @@ impl Plugin for Gritz {
             let num_samples = channel_samples.len();
 
             let gain = self.params.gain.smoothed.next();
+            let a = self.params.saturation.smoothed.next();
             for sample in channel_samples {
+                // Apply saturation
+                let k = 2.0 * a / (1.0 - a);
+                *sample = ((1.0 + k) * *sample) / (1.0 + k * (*sample).abs());
+
+                // Apply gain
                 *sample *= gain;
                 amplitude += *sample;
             }
@@ -152,7 +169,8 @@ impl Plugin for Gritz {
 
 impl ClapPlugin for Gritz {
     const CLAP_ID: &'static str = "renzofrog_plugins";
-    const CLAP_DESCRIPTION: Option<&'static str> = Some("Waveshape and bitcrushing distortion, for gritty goodness");
+    const CLAP_DESCRIPTION: Option<&'static str> =
+        Some("Waveshape and bitcrushing distortion, for gritty goodness");
     const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
     const CLAP_FEATURES: &'static [ClapFeature] = &[
