@@ -7,7 +7,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::GritzParams;
+use crate::MoistParams;
 
 const STYLE: &str = include_str!("style.css");
 pub const WINDOW_WIDTH: u32 = 512;
@@ -16,7 +16,7 @@ pub const WINDOW_HEIGHT: u32 = 256;
 #[derive(Lens)]
 struct Data {
     pub gui_context: Arc<dyn GuiContext>,
-    params: Arc<GritzParams>,
+    params: Arc<MoistParams>,
     peak_meter: Arc<AtomicF32>,
 }
 
@@ -55,7 +55,7 @@ pub(crate) fn default_state() -> Arc<ViziaState> {
 }
 
 pub(crate) fn create(
-    params: Arc<GritzParams>,
+    params: Arc<MoistParams>,
     peak_meter: Arc<AtomicF32>,
     editor_state: Arc<ViziaState>,
 ) -> Option<Box<dyn Editor>> {
@@ -74,8 +74,8 @@ pub(crate) fn create(
         ResizeHandle::new(cx);
 
         VStack::new(cx, |cx| {
-            Label::new(cx, "Gritz")
-                .font(assets::NOTO_SANS_THIN)
+            Label::new(cx, "moist")
+                .font(assets::NOTO_SANS_BOLD_ITALIC)
                 .font_size(30.0)
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0))
@@ -116,7 +116,7 @@ pub(crate) fn create(
 fn make_knob<P, F>(cx: &mut Context, param_ptr: ParamPtr, params_to_param: F) -> Handle<VStack>
 where
     P: Param,
-    F: 'static + Fn(&Arc<GritzParams>) -> &P + Copy,
+    F: 'static + Fn(&Arc<MoistParams>) -> &P + Copy,
 {
     VStack::new(cx, move |cx| {
         // Param name

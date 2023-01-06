@@ -4,7 +4,7 @@
     Under GPLv3 License
 */
 .container {
-    background-color: #2c2c2c;
+    background-color: #ffc7e4;
 }
 
 .knobs {
@@ -64,7 +64,7 @@ button {
 
 label {
     font-size: 20;
-    color: #C2C2C2;
+    color: #474747;
     height: 20px;
 }
 
@@ -78,5 +78,5 @@ knob .tick {
 }
 
 knob .track {
-    background-color: #1eafaf;
+    background-color: #33c764;
 }

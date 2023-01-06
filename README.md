@@ -1,11 +1,11 @@
-# Gritz
+# moist 
 
-Waveshape and bitcrushing distortion, for gritty goodness.
+Saturation and distortion, for moist goodness.
 
 ## Building
 
-After installing [Rust](https://rustup.rs/), you can compile Gritz as follows:
+After installing [Rust](https://rustup.rs/), you can compile moist as follows:
 
 ```shell
-cargo xtask bundle gritz --release
+cargo xtask bundle moist --release
 ```

@@ -1,7 +1,7 @@
 use nih_plug::prelude::*;
 
-use gritz::Gritz;
+use moist::Moist;
 
 fn main() {
-    nih_export_standalone::<Gritz>();
+    nih_export_standalone::<Moist>();
 }

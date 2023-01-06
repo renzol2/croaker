@@ -9,8 +9,8 @@ mod editor;
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
-pub struct Gritz {
-    params: Arc<GritzParams>,
+pub struct Moist {
+    params: Arc<MoistParams>,
 
     /// Needed to normalize the peak meter's response based on the sample rate.
     peak_meter_decay_weight: f32,
@@ -23,7 +23,7 @@ pub struct Gritz {
 }
 
 #[derive(Params)]
-struct GritzParams {
+struct MoistParams {
     /// The editor state, saved together with the parameter state so the custom scaling can be
     /// restored.
     #[persist = "editor-state"]
@@ -36,10 +36,10 @@ struct GritzParams {
     pub saturation: FloatParam,
 }
 
-impl Default for Gritz {
+impl Default for Moist {
     fn default() -> Self {
         Self {
-            params: Arc::new(GritzParams::default()),
+            params: Arc::new(MoistParams::default()),
 
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
@@ -47,7 +47,7 @@ impl Default for Gritz {
     }
 }
 
-impl Default for GritzParams {
+impl Default for MoistParams {
     fn default() -> Self {
         Self {
             editor_state: editor::default_state(),
@@ -69,7 +69,10 @@ impl Default for GritzParams {
             saturation: FloatParam::new(
                 "Saturation",
                 0.5,
-                FloatRange::Linear { min: 0.0, max: 0.999 },
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 0.999,
+                },
             )
             .with_smoother(SmoothingStyle::Linear(50.0))
             .with_value_to_string(formatters::v2s_f32_rounded(2)),
@@ -77,8 +80,8 @@ impl Default for GritzParams {
     }
 }
 
-impl Plugin for Gritz {
-    const NAME: &'static str = "Gritz";
+impl Plugin for Moist {
+    const NAME: &'static str = "moist";
     const VENDOR: &'static str = "renzofrog";
     const URL: &'static str = "https://youtu.be/dQw4w9WgXcQ";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
@@ -167,10 +170,10 @@ impl Plugin for Gritz {
     }
 }
 
-impl ClapPlugin for Gritz {
+impl ClapPlugin for Moist {
     const CLAP_ID: &'static str = "renzofrog_plugins";
     const CLAP_DESCRIPTION: Option<&'static str> =
-        Some("Waveshape and bitcrushing distortion, for gritty goodness");
+        Some("Saturation and distortion, for moist goodness");
     const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
     const CLAP_FEATURES: &'static [ClapFeature] = &[
@@ -178,13 +181,13 @@ impl ClapPlugin for Gritz {
         ClapFeature::Stereo,
         ClapFeature::Mono,
         ClapFeature::Utility,
+        ClapFeature::Distortion,
     ];
 }
 
-impl Vst3Plugin for Gritz {
-    const VST3_CLASS_ID: [u8; 16] = *b"renzofrog__gritz";
+impl Vst3Plugin for Moist {
+    const VST3_CLASS_ID: [u8; 16] = *b"renzofrog__moist";
     const VST3_CATEGORIES: &'static str = "Fx|Distortion";
 }
 
-// nih_export_clap!(Gritz);
-nih_export_vst3!(Gritz);
+nih_export_vst3!(Moist);
