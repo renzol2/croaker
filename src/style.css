@@ -1,0 +1,82 @@
+/*
+    Styles credits to Fredemus and geom3trik
+    https://github.com/Fredemus/va-filter/blob/main/src/style.css
+    Under GPLv3 License
+*/
+.container {
+    background-color: #2c2c2c;
+}
+
+.knobs {
+    child-space: 1s;
+    col-between: 15px;
+}
+
+.circuit_selector {
+    width: 360px;
+    height: auto;
+    child-space: 1s;
+    col-between: 10px;
+}
+
+dropdown .title {
+    background-color: #101010;
+    /* color: #C2C2C2; */
+    height: 30px;
+    width: 200px;
+    child-left: 5px;
+    child-right: 5px;
+    child-top: 1s;
+    child-bottom: 1s;
+    col-between: 5px;
+    border-width: 0px;
+}
+
+dropdown .arrow {
+    font: "icons";
+    top: 1s;
+    bottom: 1s;
+    left: 1s;
+}
+
+dropdown>popup {
+    background-color: #141414;
+    left: 1s;
+    right: 1s;
+}
+dropdown list label {
+    color: #C2C2C2;
+    border-width: 1px;
+    border-color: #756e6e;
+}
+
+dropdown>popup>list {
+    width: 200px;
+}
+
+button {
+    width: auto;
+    height: auto;
+    child-space: 5px;
+    background-color: gray;
+    border-radius: 0px;
+}
+
+label {
+    font-size: 20;
+    color: #C2C2C2;
+    height: 20px;
+}
+
+knob {
+    width: 70px;
+    height: 70px;
+}
+
+knob .tick {
+    background-color: #eeece4be;
+}
+
+knob .track {
+    background-color: #1eafaf;
+}

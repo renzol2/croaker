@@ -68,7 +68,7 @@ impl Default for GritzParams {
 
             saturation: FloatParam::new(
                 "Saturation",
-                0.0,
+                0.5,
                 FloatRange::Linear { min: 0.0, max: 0.999 },
             )
             .with_smoother(SmoothingStyle::Linear(50.0))
