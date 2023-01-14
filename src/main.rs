@@ -1,7 +1,7 @@
 use nih_plug::prelude::*;
 
-use moist::Moist;
+use croaker::Croaker;
 
 fn main() {
-    nih_export_standalone::<Moist>();
+    nih_export_standalone::<Croaker>();
 }

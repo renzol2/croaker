@@ -470,6 +470,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "croaker"
+version = "0.1.0"
+dependencies = [
+ "atomic_float",
+ "nih_plug",
+ "nih_plug_vizia",
+ "nih_plug_xtask",
+]
+
+[[package]]
 name = "crossbeam"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1184,16 +1194,6 @@ dependencies = [
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.42.0",
-]
-
-[[package]]
-name = "moist"
-version = "0.1.0"
-dependencies = [
- "atomic_float",
- "nih_plug",
- "nih_plug_vizia",
- "nih_plug_xtask",
 ]
 
 [[package]]

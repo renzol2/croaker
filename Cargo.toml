@@ -1,11 +1,11 @@
 [package]
-name = "moist"
+name = "croaker"
 version = "0.1.0"
 edition = "2021"
 authors = ["Renzo Ledesma <renzomledesma@gmail.com>"]
 license = "GPL-3.0-or-later"
 homepage = "renzomledesma.me"
-description = "Saturation and distortion, for moist goodness"
+description = "saturator/distorter/makes sound go croak"
 
 [workspace]
 members = ["xtask"]

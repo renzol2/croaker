@@ -9,8 +9,8 @@ mod editor;
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
-pub struct Moist {
-    params: Arc<MoistParams>,
+pub struct Croaker {
+    params: Arc<CroakerParams>,
 
     /// Needed to normalize the peak meter's response based on the sample rate.
     peak_meter_decay_weight: f32,
@@ -23,7 +23,7 @@ pub struct Moist {
 }
 
 #[derive(Params)]
-struct MoistParams {
+struct CroakerParams {
     /// The editor state, saved together with the parameter state so the custom scaling can be
     /// restored.
     #[persist = "editor-state"]
@@ -36,10 +36,10 @@ struct MoistParams {
     pub saturation: FloatParam,
 }
 
-impl Default for Moist {
+impl Default for Croaker {
     fn default() -> Self {
         Self {
-            params: Arc::new(MoistParams::default()),
+            params: Arc::new(CroakerParams::default()),
 
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
@@ -47,7 +47,7 @@ impl Default for Moist {
     }
 }
 
-impl Default for MoistParams {
+impl Default for CroakerParams {
     fn default() -> Self {
         Self {
             editor_state: editor::default_state(),
@@ -80,10 +80,10 @@ impl Default for MoistParams {
     }
 }
 
-impl Plugin for Moist {
-    const NAME: &'static str = "moist";
+impl Plugin for Croaker {
+    const NAME: &'static str = "croaker";
     const VENDOR: &'static str = "renzofrog";
-    const URL: &'static str = "https://youtu.be/dQw4w9WgXcQ";
+    const URL: &'static str = "https://www.renzofrog.com";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
 
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -170,10 +170,10 @@ impl Plugin for Moist {
     }
 }
 
-impl ClapPlugin for Moist {
+impl ClapPlugin for Croaker {
     const CLAP_ID: &'static str = "renzofrog_plugins";
     const CLAP_DESCRIPTION: Option<&'static str> =
-        Some("Saturation and distortion, for moist goodness");
+        Some("saturator/distorter/makes sound go croak");
     const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
     const CLAP_FEATURES: &'static [ClapFeature] = &[
@@ -185,9 +185,9 @@ impl ClapPlugin for Moist {
     ];
 }
 
-impl Vst3Plugin for Moist {
-    const VST3_CLASS_ID: [u8; 16] = *b"renzofrog__moist";
+impl Vst3Plugin for Croaker {
+    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroaker";
     const VST3_CATEGORIES: &'static str = "Fx|Distortion";
 }
 
-nih_export_vst3!(Moist);
+nih_export_vst3!(Croaker);

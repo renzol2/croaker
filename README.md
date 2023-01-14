@@ -1,11 +1,11 @@
-# moist 
+# renzofrog croaker
 
-Saturation and distortion, for moist goodness.
+saturator/distorter/makes sound go croak
 
 ## Building
 
-After installing [Rust](https://rustup.rs/), you can compile moist as follows:
+After installing [Rust](https://rustup.rs/), you can compile croaker as follows:
 
 ```shell
-cargo xtask bundle moist --release
+cargo xtask bundle croaker --release
 ```
