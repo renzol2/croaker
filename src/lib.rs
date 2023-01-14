@@ -32,6 +32,9 @@ struct CroakerParams {
     #[id = "gain"]
     pub gain: FloatParam,
 
+    #[id = "dry-wet"]
+    pub dry_wet_ratio: FloatParam,
+
     #[id = "saturation"]
     pub saturation: FloatParam,
 }
@@ -72,6 +75,17 @@ impl Default for CroakerParams {
                 FloatRange::Linear {
                     min: 0.0,
                     max: 0.999,
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(50.0))
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            dry_wet_ratio: FloatParam::new(
+                "Dry/wet",
+                0.5,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 1.0,
                 },
             )
             .with_smoother(SmoothingStyle::Linear(50.0))
@@ -139,10 +153,14 @@ impl Plugin for Croaker {
 
             let gain = self.params.gain.smoothed.next();
             let a = self.params.saturation.smoothed.next();
+            let dry_wet_ratio = self.params.dry_wet_ratio.smoothed.next();
             for sample in channel_samples {
                 // Apply saturation
                 let k = 2.0 * a / (1.0 - a);
-                *sample = ((1.0 + k) * *sample) / (1.0 + k * (*sample).abs());
+                let wet = ((1.0 + k) * *sample) / (1.0 + k * (*sample).abs());
+
+                // Apply dry/wet
+                *sample = (*sample * (1.0 - dry_wet_ratio)) + (wet * dry_wet_ratio);
 
                 // Apply gain
                 *sample *= gain;

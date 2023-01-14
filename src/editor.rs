@@ -91,6 +91,11 @@ pub(crate) fn create(
                 // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
                 // ParamSlider::new(cx, Data::params, |params| &params.saturation);
                 make_knob(cx, params.saturation.as_ptr(), |params| &params.saturation);
+
+                // Dry/wet control
+                // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
+                // ParamSlider::new(cx, Data::params, |params| &params.saturation);
+                make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| &params.dry_wet_ratio);
             }).class("knobs");
 
             PeakMeter::new(
