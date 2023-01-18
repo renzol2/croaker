@@ -17,8 +17,8 @@ pub const WINDOW_HEIGHT: u32 = 330;
 struct Data {
     pub gui_context: Arc<dyn GuiContext>,
     params: Arc<CroakerParams>,
-    peak_meter: Arc<AtomicF32>,
     input_peak_meter: Arc<AtomicF32>,
+    output_peak_meter: Arc<AtomicF32>,
 }
 
 // `ParamChangeEvent` enum credits to Fredemus and geom3trik
@@ -57,8 +57,8 @@ pub(crate) fn default_state() -> Arc<ViziaState> {
 
 pub(crate) fn create(
     params: Arc<CroakerParams>,
-    peak_meter: Arc<AtomicF32>,
     input_peak_meter: Arc<AtomicF32>,
+    output_peak_meter: Arc<AtomicF32>,
     editor_state: Arc<ViziaState>,
 ) -> Option<Box<dyn Editor>> {
     create_vizia_editor(editor_state, ViziaTheming::Custom, move |cx, context| {
@@ -69,8 +69,8 @@ pub(crate) fn create(
         Data {
             gui_context: context.clone(),
             params: params.clone(),
-            peak_meter: peak_meter.clone(),
             input_peak_meter: input_peak_meter.clone(),
+            output_peak_meter: output_peak_meter.clone(),
         }
         .build(cx);
 
@@ -108,7 +108,7 @@ pub(crate) fn create(
                 // Gain control
                 // Label::new(cx, "Gain").bottom(Pixels(-1.0));
                 // ParamSlider::new(cx, Data::params, |params| &params.gain);
-                make_knob(cx, params.gain.as_ptr(), |params| &params.gain);
+                make_knob(cx, params.output_gain.as_ptr(), |params| &params.output_gain);
             })
             .class("knobs")
             .bottom(Pixels(10.0));
@@ -138,7 +138,7 @@ pub(crate) fn create(
                 // Output gain meter
                 PeakMeter::new(
                     cx,
-                    Data::peak_meter
+                    Data::output_peak_meter
                         .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
                     Some(Duration::from_millis(600)),
                 );
