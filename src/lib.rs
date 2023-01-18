@@ -36,7 +36,7 @@ struct CroakerParams {
     #[id = "input-gain"]
     pub input_gain: FloatParam,
 
-    #[id = "gain"]
+    #[id = "output-gain"]
     pub output_gain: FloatParam,
 
     #[id = "dry-wet"]
