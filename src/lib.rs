@@ -159,6 +159,10 @@ impl Plugin for Croaker {
             .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
             as f32;
 
+        self.input_peak_meter_decay_weight = 0.25f64
+            .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
+            as f32;
+
         true
     }
 

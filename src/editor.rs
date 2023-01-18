@@ -65,7 +65,8 @@ pub(crate) fn create(
         assets::register_noto_sans_light(cx);
         assets::register_noto_sans_thin(cx);
         cx.add_theme(STYLE);
-Data {
+
+        Data {
             gui_context: context.clone(),
             params: params.clone(),
             peak_meter: peak_meter.clone(),
@@ -75,23 +76,17 @@ Data {
 
         ResizeHandle::new(cx);
 
+        // UI
         VStack::new(cx, |cx| {
             Label::new(cx, "croaker")
-                .font(assets::NOTO_SANS_BOLD_ITALIC)
+                .font(assets::NOTO_SANS_BOLD)
                 .font_size(25.0)
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0))
-                .child_bottom(Pixels(0.0));
+                .child_bottom(Pixels(0.0))
+                .bottom(Pixels(15.0));
 
-            // Input gain meter
-            PeakMeter::new(
-                cx,
-                Data::input_peak_meter
-                    .map(|input_peak_meter| util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))),
-                Some(Duration::from_millis(600)),
-            )
-            .top(Pixels(10.0));
-
+            // Knobs
             HStack::new(cx, |cx| {
                 // Input gain control
                 // Label::new(cx, "Gain").bottom(Pixels(-1.0));
@@ -106,22 +101,49 @@ Data {
                 // Dry/wet control
                 // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
                 // ParamSlider::new(cx, Data::params, |params| &params.saturation);
-                make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| &params.dry_wet_ratio);
+                make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| {
+                    &params.dry_wet_ratio
+                });
 
                 // Gain control
                 // Label::new(cx, "Gain").bottom(Pixels(-1.0));
                 // ParamSlider::new(cx, Data::params, |params| &params.gain);
                 make_knob(cx, params.gain.as_ptr(), |params| &params.gain);
             })
-            .class("knobs");
+            .class("knobs")
+            .bottom(Pixels(10.0));
 
-            PeakMeter::new(
-                cx,
-                Data::peak_meter
-                    .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
-                Some(Duration::from_millis(600)),
-            )
-            // This is how adding padding works in vizia
+            HStack::new(cx, |cx| {
+                // Input gain label
+                Label::new(cx, "Input gain").font_size(15.0);
+
+                // Input gain meter
+                PeakMeter::new(
+                    cx,
+                    Data::input_peak_meter.map(|input_peak_meter| {
+                        util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
+                    }),
+                    Some(Duration::from_millis(600)),
+                );
+            })
+            .col_between(Pixels(7.0))
+            .top(Pixels(15.0))
+            .bottom(Pixels(-40.0));
+
+            // Output gain
+            HStack::new(cx, |cx| {
+                // Output gain label
+                Label::new(cx, "Output gain").font_size(15.0);
+
+                // Output gain meter
+                PeakMeter::new(
+                    cx,
+                    Data::peak_meter
+                        .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
+                    Some(Duration::from_millis(600)),
+                );
+            })
+            .col_between(Pixels(7.0))
             .bottom(Pixels(10.0));
         })
         .row_between(Pixels(0.0))
