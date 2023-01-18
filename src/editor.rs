@@ -11,13 +11,14 @@ use crate::CroakerParams;
 
 const STYLE: &str = include_str!("style.css");
 pub const WINDOW_WIDTH: u32 = 512;
-pub const WINDOW_HEIGHT: u32 = 256;
+pub const WINDOW_HEIGHT: u32 = 330;
 
 #[derive(Lens)]
 struct Data {
     pub gui_context: Arc<dyn GuiContext>,
     params: Arc<CroakerParams>,
-    peak_meter: Arc<AtomicF32>,
+    input_peak_meter: Arc<AtomicF32>,
+    output_peak_meter: Arc<AtomicF32>,
 }
 
 // `ParamChangeEvent` enum credits to Fredemus and geom3trik
@@ -56,7 +57,8 @@ pub(crate) fn default_state() -> Arc<ViziaState> {
 
 pub(crate) fn create(
     params: Arc<CroakerParams>,
-    peak_meter: Arc<AtomicF32>,
+    input_peak_meter: Arc<AtomicF32>,
+    output_peak_meter: Arc<AtomicF32>,
     editor_state: Arc<ViziaState>,
 ) -> Option<Box<dyn Editor>> {
     create_vizia_editor(editor_state, ViziaTheming::Custom, move |cx, context| {
@@ -67,25 +69,29 @@ pub(crate) fn create(
         Data {
             gui_context: context.clone(),
             params: params.clone(),
-            peak_meter: peak_meter.clone(),
+            input_peak_meter: input_peak_meter.clone(),
+            output_peak_meter: output_peak_meter.clone(),
         }
         .build(cx);
 
         ResizeHandle::new(cx);
 
+        // UI
         VStack::new(cx, |cx| {
-            Label::new(cx, "renzofrog croaker")
-                .font(assets::NOTO_SANS_BOLD_ITALIC)
-                .font_size(30.0)
+            Label::new(cx, "croaker")
+                .font(assets::NOTO_SANS_BOLD)
+                .font_size(25.0)
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0))
-                .child_bottom(Pixels(0.0));
+                .child_bottom(Pixels(0.0))
+                .bottom(Pixels(15.0));
 
+            // Knobs
             HStack::new(cx, |cx| {
-                // Gain control
+                // Input gain control
                 // Label::new(cx, "Gain").bottom(Pixels(-1.0));
                 // ParamSlider::new(cx, Data::params, |params| &params.gain);
-                make_knob(cx, params.gain.as_ptr(), |params| &params.gain);
+                make_knob(cx, params.input_gain.as_ptr(), |params| &params.input_gain);
 
                 // Saturation control
                 // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
@@ -95,17 +101,51 @@ pub(crate) fn create(
                 // Dry/wet control
                 // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
                 // ParamSlider::new(cx, Data::params, |params| &params.saturation);
-                make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| &params.dry_wet_ratio);
-            }).class("knobs");
+                make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| {
+                    &params.dry_wet_ratio
+                });
 
-            PeakMeter::new(
-                cx,
-                Data::peak_meter
-                    .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
-                Some(Duration::from_millis(600)),
-            )
-            // This is how adding padding works in vizia
-            .top(Pixels(10.0))
+                // Gain control
+                // Label::new(cx, "Gain").bottom(Pixels(-1.0));
+                // ParamSlider::new(cx, Data::params, |params| &params.gain);
+                make_knob(cx, params.output_gain.as_ptr(), |params| {
+                    &params.output_gain
+                });
+            })
+            .class("knobs")
+            .bottom(Pixels(10.0));
+
+            HStack::new(cx, |cx| {
+                // Input gain label
+                Label::new(cx, "Input gain").font_size(15.0);
+
+                // Input gain meter
+                PeakMeter::new(
+                    cx,
+                    Data::input_peak_meter.map(|input_peak_meter| {
+                        util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
+                    }),
+                    Some(Duration::from_millis(600)),
+                );
+            })
+            .col_between(Pixels(7.0))
+            .top(Pixels(15.0))
+            .bottom(Pixels(-40.0));
+
+            // Output gain
+            HStack::new(cx, |cx| {
+                // Output gain label
+                Label::new(cx, "Output gain").font_size(15.0);
+
+                // Output gain meter
+                PeakMeter::new(
+                    cx,
+                    Data::output_peak_meter
+                        .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
+                    Some(Duration::from_millis(600)),
+                );
+            })
+            .col_between(Pixels(7.0))
             .bottom(Pixels(10.0));
         })
         .row_between(Pixels(0.0))
