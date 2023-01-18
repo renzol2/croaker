@@ -108,7 +108,9 @@ pub(crate) fn create(
                 // Gain control
                 // Label::new(cx, "Gain").bottom(Pixels(-1.0));
                 // ParamSlider::new(cx, Data::params, |params| &params.gain);
-                make_knob(cx, params.output_gain.as_ptr(), |params| &params.output_gain);
+                make_knob(cx, params.output_gain.as_ptr(), |params| {
+                    &params.output_gain
+                });
             })
             .class("knobs")
             .bottom(Pixels(10.0));
