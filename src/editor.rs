@@ -6,12 +6,15 @@ use nih_plug_vizia::{assets, create_vizia_editor, ViziaState, ViziaTheming};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
+use std::vec;
+
+use nih_plug_vizia::vizia::views::PopupEvent;
 
 use crate::CroakerParams;
 
 const STYLE: &str = include_str!("style.css");
-pub const WINDOW_WIDTH: u32 = 512;
-pub const WINDOW_HEIGHT: u32 = 330;
+pub const WINDOW_WIDTH: u32 = 650;
+pub const WINDOW_HEIGHT: u32 = 500;
 
 #[derive(Lens)]
 struct Data {
@@ -19,6 +22,7 @@ struct Data {
     params: Arc<CroakerParams>,
     input_peak_meter: Arc<AtomicF32>,
     output_peak_meter: Arc<AtomicF32>,
+    distortion_types: Vec<String>,
 }
 
 // `ParamChangeEvent` enum credits to Fredemus and geom3trik
@@ -29,6 +33,8 @@ pub enum ParamChangeEvent {
     BeginSet(ParamPtr),
     EndSet(ParamPtr),
     SetParam(ParamPtr, f32),
+
+    DistortionEvent(usize),
 }
 
 impl Model for Data {
@@ -38,6 +44,22 @@ impl Model for Data {
                 unsafe {
                     self.gui_context
                         .raw_set_parameter_normalized(*param_ptr, *new_value)
+                };
+            }
+            ParamChangeEvent::DistortionEvent(index) => {
+                unsafe {
+                    self.gui_context
+                        .raw_begin_set_parameter(self.params.distortion_type.as_ptr())
+                };
+                unsafe {
+                    self.gui_context.raw_set_parameter_normalized(
+                        self.params.distortion_type.as_ptr(),
+                        *index as f32 / 2.,
+                    )
+                };
+                unsafe {
+                    self.gui_context
+                        .raw_end_set_parameter(self.params.distortion_type.as_ptr())
                 };
             }
             ParamChangeEvent::BeginSet(param_ptr) => {
@@ -71,6 +93,15 @@ pub(crate) fn create(
             params: params.clone(),
             input_peak_meter: input_peak_meter.clone(),
             output_peak_meter: output_peak_meter.clone(),
+            distortion_types: vec![
+                "Saturation".to_string(),
+                "Hard clipping".to_string(),
+                "Fuzzy rectifier".to_string(),
+                "Shockley diode rectifer".to_string(),
+                "Dropout".to_string(),
+                "Double soft clipper".to_string(),
+                "Wavefolder".to_string(),
+            ],
         }
         .build(cx);
 
@@ -78,6 +109,7 @@ pub(crate) fn create(
 
         // UI
         VStack::new(cx, |cx| {
+            // Title
             Label::new(cx, "croaker")
                 .font(assets::NOTO_SANS_BOLD)
                 .font_size(25.0)
@@ -85,6 +117,49 @@ pub(crate) fn create(
                 .child_top(Stretch(1.0))
                 .child_bottom(Pixels(0.0))
                 .bottom(Pixels(15.0));
+
+            // Waveshaper dropdown
+            VStack::new(cx, |cx| {
+                HStack::new(cx, |cx| {
+                    Label::new(cx, "Type");
+                    // Dropdown to select waveshaper
+                    Dropdown::new(
+                        cx,
+                        move |cx|
+                        // A Label and an Icon
+                        HStack::new(cx, move |cx|{
+                            Label::new(cx, Data::params.map(|p| p.distortion_type.to_string())).left(Auto);
+                            // Label::new(cx, ICON_DOWN_OPEN).class("arrow");
+                        }).class("title"),
+                        move |cx| {
+                            // List of options
+                            List::new(cx, Data::distortion_types, move |cx, idx, item| {
+                                VStack::new(cx, move |cx| {
+                                    Binding::new(
+                                        cx,
+                                        Data::params.map(|p| p.distortion_type.to_string()),
+                                        move |cx, choice| {
+                                            let selected = *item.get(cx) == *choice.get(cx);
+                                            Label::new(cx, &item.get(cx))
+                                                .width(Stretch(1.0))
+                                                .background_color(if selected {
+                                                    Color::from("#C28919")
+                                                } else {
+                                                    Color::transparent()
+                                                })
+                                                .on_press(move |cx| {
+                                                    cx.emit(ParamChangeEvent::DistortionEvent(idx));
+                                                    cx.emit(PopupEvent::Close);
+                                                });
+                                        },
+                                    );
+                                });
+                            });
+                        },
+                    );
+                })
+                .class("waveshaper_selector");
+            }).bottom(Pixels(-20.0));
 
             // Knobs
             HStack::new(cx, |cx| {
@@ -96,7 +171,7 @@ pub(crate) fn create(
                 // Saturation control
                 // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
                 // ParamSlider::new(cx, Data::params, |params| &params.saturation);
-                make_knob(cx, params.saturation.as_ptr(), |params| &params.saturation);
+                make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
 
                 // Dry/wet control
                 // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
