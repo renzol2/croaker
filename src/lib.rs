@@ -3,12 +3,19 @@ use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use std::sync::Arc;
 
+pub mod waveshapers;
+use waveshapers::*;
+
+pub mod dc_filter;
+use dc_filter::DcFilter;
+
+pub mod oversampling;
+use oversampling::HalfbandFilter;
+
 mod editor;
 
-/// The time it takes for the peak meter to decay by 12 dB after switching to complete silence.
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
-/// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct Croaker {
     params: Arc<CroakerParams>,
 
@@ -24,12 +31,15 @@ pub struct Croaker {
     // Input gain peak meter members
     input_peak_meter_decay_weight: f32,
     input_peak_meter: Arc<AtomicF32>,
+
+    upsampler: HalfbandFilter,
+    downsampler: HalfbandFilter,
+    dc_filter: DcFilter,
+    oversample_factor: usize,
 }
 
 #[derive(Params)]
 struct CroakerParams {
-    /// The editor state, saved together with the parameter state so the custom scaling can be
-    /// restored.
     #[persist = "editor-state"]
     editor_state: Arc<ViziaState>,
 
@@ -42,8 +52,11 @@ struct CroakerParams {
     #[id = "dry-wet"]
     pub dry_wet_ratio: FloatParam,
 
-    #[id = "saturation"]
-    pub saturation: FloatParam,
+    #[id = "drive"]
+    pub drive: FloatParam,
+
+    #[id = "distortion-type"]
+    pub distortion_type: EnumParam<DistortionType>,
 }
 
 impl Default for Croaker {
@@ -55,6 +68,11 @@ impl Default for Croaker {
             output_peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             input_peak_meter_decay_weight: 1.0,
             input_peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
+
+            upsampler: HalfbandFilter::new(8, true),
+            downsampler: HalfbandFilter::new(8, true),
+            dc_filter: DcFilter::default(),
+            oversample_factor: 4,
         }
     }
 }
@@ -92,8 +110,8 @@ impl Default for CroakerParams {
             .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
             .with_string_to_value(formatters::s2v_f32_gain_to_db()),
 
-            saturation: FloatParam::new(
-                "Saturation",
+            drive: FloatParam::new(
+                "Drive",
                 0.5,
                 FloatRange::Linear {
                     min: 0.0,
@@ -110,12 +128,14 @@ impl Default for CroakerParams {
             )
             .with_smoother(SmoothingStyle::Linear(50.0))
             .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            distortion_type: EnumParam::new("Type", DistortionType::Saturation),
         }
     }
 }
 
 impl Plugin for Croaker {
-    const NAME: &'static str = "croaker";
+    const NAME: &'static str = "croaker0.1";
     const VENDOR: &'static str = "renzofrog";
     const URL: &'static str = "https://www.renzofrog.com";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
@@ -163,6 +183,12 @@ impl Plugin for Croaker {
             .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
             as f32;
 
+        let fs = buffer_config.sample_rate;
+        if fs >= 88200. {
+            self.oversample_factor = 1;
+        } else {
+            self.oversample_factor = 4;
+        }
         true
     }
 
@@ -173,67 +199,49 @@ impl Plugin for Croaker {
         _context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         for channel_samples in buffer.iter_samples() {
-            let mut input_amplitude = 0.0;
-            let mut output_amplitude = 0.0;
-            let num_samples = channel_samples.len();
-
             let input_gain = self.params.input_gain.smoothed.next();
             let output_gain = self.params.output_gain.smoothed.next();
-            let a = self.params.saturation.smoothed.next();
+            let drive = self.params.drive.smoothed.next();
             let dry_wet_ratio = self.params.dry_wet_ratio.smoothed.next();
+            let distortion_type = self.params.distortion_type.value();
+
             for sample in channel_samples {
+                // Apply DC filter
+                *sample = self.dc_filter.process(*sample);
+
                 // Apply input gain
                 *sample *= input_gain;
-                input_amplitude += *sample;
 
-                // Apply saturation
-                let k = 2.0 * a / (1.0 - a);
-                let wet = ((1.0 + k) * *sample) / (1.0 + k * (*sample).abs());
+                // Oversample if needed
+                let processed_sample = if self.oversample_factor == 4 {
+                    // Zero-stuff
+                    let input = *sample;
+                    let mut frame = [input, 0., 0., 0.];
 
-                // Apply dry/wet
-                *sample = (*sample * (1.0 - dry_wet_ratio)) + (wet * dry_wet_ratio);
+                    // Apply processing
+                    for i in 0..frame.len() {
+                        // Run input through half-band filter
+                        frame[i] = self.upsampler.process(frame[i]);
 
-                // Apply output gain
-                *sample *= output_gain;
-                output_amplitude += *sample;
-            }
+                        // Apply distortion
+                        let wet = process_sample(&distortion_type, drive, frame[i]);
 
-            // To save resources, a plugin can (and probably should!) only perform expensive
-            // calculations that are only displayed on the GUI while the GUI is open
-            if self.params.editor_state.is_open() {
-                input_amplitude = (input_amplitude / num_samples as f32).abs();
-                output_amplitude = (output_amplitude / num_samples as f32).abs();
-
-                let current_input_peak_meter = self
-                    .input_peak_meter
-                    .load(std::sync::atomic::Ordering::Relaxed);
-                let current_output_peak_meter = self
-                    .output_peak_meter
-                    .load(std::sync::atomic::Ordering::Relaxed);
-
-                let get_new_peak_meter = |amp: f32, meter: f32, weight: f32| {
-                    if amp > meter {
-                        amp
-                    } else {
-                        meter * weight + amp * (1.0 - weight)
+                        // Downsample through half-band filter
+                        frame[i] = self.downsampler.process(wet);
                     }
+
+                    // Get output after downsampling
+                    frame[0]
+                } else {
+                    // Don't oversample if not needed
+                    process_sample(&distortion_type, drive, *sample)
                 };
 
-                let new_input_peak_meter = get_new_peak_meter(
-                    input_amplitude,
-                    current_input_peak_meter,
-                    self.input_peak_meter_decay_weight,
-                );
-                let new_output_peak_meter = get_new_peak_meter(
-                    output_amplitude,
-                    current_output_peak_meter,
-                    self.output_peak_meter_decay_weight,
-                );
+                // Apply dry/wet and rewrite buffer
+                let processed_sample =
+                    (*sample * (1.0 - dry_wet_ratio)) + (processed_sample * dry_wet_ratio);
 
-                self.input_peak_meter
-                    .store(new_input_peak_meter, std::sync::atomic::Ordering::Relaxed);
-                self.output_peak_meter
-                    .store(new_output_peak_meter, std::sync::atomic::Ordering::Relaxed);
+                *sample = processed_sample * output_gain;
             }
         }
 
