@@ -54,7 +54,7 @@ impl Model for Data {
                 unsafe {
                     self.gui_context.raw_set_parameter_normalized(
                         self.params.distortion_type.as_ptr(),
-                        *index as f32 / 2.,
+                        *index as f32 / self.distortion_types.len() as f32,
                     )
                 };
                 unsafe {
@@ -97,7 +97,7 @@ pub(crate) fn create(
                 "Saturation".to_string(),
                 "Hard clipping".to_string(),
                 "Fuzzy rectifier".to_string(),
-                "Shockley diode rectifer".to_string(),
+                "Shockley diode rectifier".to_string(),
                 "Dropout".to_string(),
                 "Double soft clipper".to_string(),
                 "Wavefolder".to_string(),
@@ -121,15 +121,13 @@ pub(crate) fn create(
             // Waveshaper dropdown
             VStack::new(cx, |cx| {
                 HStack::new(cx, |cx| {
-                    Label::new(cx, "Type");
                     // Dropdown to select waveshaper
                     Dropdown::new(
                         cx,
                         move |cx|
                         // A Label and an Icon
                         HStack::new(cx, move |cx|{
-                            Label::new(cx, Data::params.map(|p| p.distortion_type.to_string())).left(Auto);
-                            // Label::new(cx, ICON_DOWN_OPEN).class("arrow");
+                            Label::new(cx, Data::params.map(|p| p.distortion_type.to_string()));
                         }).class("title"),
                         move |cx| {
                             // List of options
@@ -159,7 +157,7 @@ pub(crate) fn create(
                     );
                 })
                 .class("waveshaper_selector");
-            }).bottom(Pixels(-20.0));
+            });
 
             // Knobs
             HStack::new(cx, |cx| {

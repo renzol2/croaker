@@ -7,21 +7,10 @@
     background-color: #ffc7e4;
 }
 
-.knobs {
-    top: 1s;
-    bottom: 1s;
-}
-
 .waveshaper_selector {
     font-size: 5px;
     width: 100;
     height: auto;
-}
-
-dropdown .title {
-    color: #C2C2C2;
-    height: 30px;
-    width: 250px;
 }
 
 dropdown>popup {
