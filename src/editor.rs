@@ -31,8 +31,6 @@ pub enum ParamChangeEvent {
     BeginSet(ParamPtr),
     EndSet(ParamPtr),
     SetParam(ParamPtr, f32),
-
-    DistortionEvent(usize),
 }
 
 impl Model for Data {
@@ -42,22 +40,6 @@ impl Model for Data {
                 unsafe {
                     self.gui_context
                         .raw_set_parameter_normalized(*param_ptr, *new_value)
-                };
-            }
-            ParamChangeEvent::DistortionEvent(index) => {
-                unsafe {
-                    self.gui_context
-                        .raw_begin_set_parameter(self.params.distortion_type.as_ptr())
-                };
-                unsafe {
-                    self.gui_context.raw_set_parameter_normalized(
-                        self.params.distortion_type.as_ptr(),
-                        *index as f32 / self.distortion_types.len() as f32,
-                    )
-                };
-                unsafe {
-                    self.gui_context
-                        .raw_end_set_parameter(self.params.distortion_type.as_ptr())
                 };
             }
             ParamChangeEvent::BeginSet(param_ptr) => {
