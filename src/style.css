@@ -13,6 +13,13 @@
     height: auto;
 }
 
+.gain_meters {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    align-content: center;
+}
+
 dropdown>popup {
     background-color: #141414;
     left: 1s;

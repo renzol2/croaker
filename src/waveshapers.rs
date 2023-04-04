@@ -1,7 +1,7 @@
 use nih_plug::prelude::*;
 use std::f32::consts::{E, PI};
 
-#[derive(Enum, Debug, PartialEq, Eq)]
+#[derive(Enum, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum DistortionType {
     #[id = "saturation"]
     #[name = "Saturation"]

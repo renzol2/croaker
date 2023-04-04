@@ -8,13 +8,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::vec;
 
-use nih_plug_vizia::vizia::views::PopupEvent;
-
 use crate::CroakerParams;
 
 const STYLE: &str = include_str!("style.css");
-pub const WINDOW_WIDTH: u32 = 650;
-pub const WINDOW_HEIGHT: u32 = 500;
+pub const WINDOW_WIDTH: u32 = 550;
+pub const WINDOW_HEIGHT: u32 = 380;
 
 #[derive(Lens)]
 struct Data {
@@ -112,114 +110,72 @@ pub(crate) fn create(
             // Title
             Label::new(cx, "croaker")
                 .font(assets::NOTO_SANS_BOLD)
-                .font_size(25.0)
+                .font_size(30.0)
                 .height(Pixels(50.0))
-                .child_top(Stretch(1.0))
-                .child_bottom(Pixels(0.0))
-                .bottom(Pixels(15.0));
-
-            // Waveshaper dropdown
-            VStack::new(cx, |cx| {
-                HStack::new(cx, |cx| {
-                    // Dropdown to select waveshaper
-                    Dropdown::new(
-                        cx,
-                        move |cx|
-                        // A Label and an Icon
-                        HStack::new(cx, move |cx|{
-                            Label::new(cx, Data::params.map(|p| p.distortion_type.to_string()));
-                        }).class("title"),
-                        move |cx| {
-                            // List of options
-                            List::new(cx, Data::distortion_types, move |cx, idx, item| {
-                                VStack::new(cx, move |cx| {
-                                    Binding::new(
-                                        cx,
-                                        Data::params.map(|p| p.distortion_type.to_string()),
-                                        move |cx, choice| {
-                                            let selected = *item.get(cx) == *choice.get(cx);
-                                            Label::new(cx, &item.get(cx))
-                                                .width(Stretch(1.0))
-                                                .background_color(if selected {
-                                                    Color::from("#C28919")
-                                                } else {
-                                                    Color::transparent()
-                                                })
-                                                .on_press(move |cx| {
-                                                    cx.emit(ParamChangeEvent::DistortionEvent(idx));
-                                                    cx.emit(PopupEvent::Close);
-                                                });
-                                        },
-                                    );
-                                });
-                            });
-                        },
-                    );
-                })
-                .class("waveshaper_selector");
-            });
+                .child_top(Stretch(1.0));
 
             // Knobs
             HStack::new(cx, |cx| {
                 // Input gain control
-                // Label::new(cx, "Gain").bottom(Pixels(-1.0));
-                // ParamSlider::new(cx, Data::params, |params| &params.gain);
                 make_knob(cx, params.input_gain.as_ptr(), |params| &params.input_gain);
 
                 // Saturation control
-                // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
-                // ParamSlider::new(cx, Data::params, |params| &params.saturation);
                 make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
 
+                // Distortion type
+                make_knob(cx, params.distortion_type.as_ptr(), |params| {
+                    &params.distortion_type
+                });
                 // Dry/wet control
-                // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
-                // ParamSlider::new(cx, Data::params, |params| &params.saturation);
                 make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| {
                     &params.dry_wet_ratio
                 });
 
-                // Gain control
-                // Label::new(cx, "Gain").bottom(Pixels(-1.0));
-                // ParamSlider::new(cx, Data::params, |params| &params.gain);
+                // Output gain control
                 make_knob(cx, params.output_gain.as_ptr(), |params| {
                     &params.output_gain
                 });
             })
             .class("knobs")
-            .bottom(Pixels(10.0));
+            .bottom(Pixels(5.0));
 
-            HStack::new(cx, |cx| {
-                // Input gain label
-                Label::new(cx, "Input gain").font_size(15.0);
+            VStack::new(cx, |cx| {
+                VStack::new(cx, |cx| {
+                    // Input gain label
+                    Label::new(cx, "Input gain").font_size(15.0);
 
-                // Input gain meter
-                PeakMeter::new(
-                    cx,
-                    Data::input_peak_meter.map(|input_peak_meter| {
-                        util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
-                    }),
-                    Some(Duration::from_millis(600)),
-                );
+                    // Input gain meter
+                    PeakMeter::new(
+                        cx,
+                        Data::input_peak_meter.map(|input_peak_meter| {
+                            util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
+                        }),
+                        Some(Duration::from_millis(600)),
+                    );
+                })
+                .col_between(Pixels(7.0))
+                .top(Pixels(15.0))
+                .bottom(Pixels(-30.0));
+
+                // Output gain
+                VStack::new(cx, |cx| {
+                    // Output gain label
+                    Label::new(cx, "Output gain").font_size(15.0);
+
+                    // Output gain meter
+                    PeakMeter::new(
+                        cx,
+                        Data::output_peak_meter
+                            .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
+                        Some(Duration::from_millis(600)),
+                    );
+                })
+                .col_between(Pixels(7.0))
+                .bottom(Pixels(10.0));
             })
-            .col_between(Pixels(7.0))
-            .top(Pixels(15.0))
-            .bottom(Pixels(-40.0));
-
-            // Output gain
-            HStack::new(cx, |cx| {
-                // Output gain label
-                Label::new(cx, "Output gain").font_size(15.0);
-
-                // Output gain meter
-                PeakMeter::new(
-                    cx,
-                    Data::output_peak_meter
-                        .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
-                    Some(Duration::from_millis(600)),
-                );
-            })
-            .col_between(Pixels(7.0))
-            .bottom(Pixels(10.0));
+            .child_left(Stretch(1.0))
+            .child_right(Stretch(1.0))
+            .class("gain_meters");
         })
         .row_between(Pixels(0.0))
         .child_left(Stretch(1.0))
