@@ -6,12 +6,13 @@ use nih_plug_vizia::{assets, create_vizia_editor, ViziaState, ViziaTheming};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
+use std::vec;
 
 use crate::CroakerParams;
 
 const STYLE: &str = include_str!("style.css");
-pub const WINDOW_WIDTH: u32 = 512;
-pub const WINDOW_HEIGHT: u32 = 330;
+pub const WINDOW_WIDTH: u32 = 550;
+pub const WINDOW_HEIGHT: u32 = 380;
 
 #[derive(Lens)]
 struct Data {
@@ -19,6 +20,7 @@ struct Data {
     params: Arc<CroakerParams>,
     input_peak_meter: Arc<AtomicF32>,
     output_peak_meter: Arc<AtomicF32>,
+    distortion_types: Vec<String>,
 }
 
 // `ParamChangeEvent` enum credits to Fredemus and geom3trik
@@ -71,6 +73,15 @@ pub(crate) fn create(
             params: params.clone(),
             input_peak_meter: input_peak_meter.clone(),
             output_peak_meter: output_peak_meter.clone(),
+            distortion_types: vec![
+                "Saturation".to_string(),
+                "Hard clipping".to_string(),
+                "Fuzzy rectifier".to_string(),
+                "Shockley diode rectifier".to_string(),
+                "Dropout".to_string(),
+                "Double soft clipper".to_string(),
+                "Wavefolder".to_string(),
+            ],
         }
         .build(cx);
 
@@ -78,75 +89,75 @@ pub(crate) fn create(
 
         // UI
         VStack::new(cx, |cx| {
+            // Title
             Label::new(cx, "croaker")
                 .font(assets::NOTO_SANS_BOLD)
-                .font_size(25.0)
+                .font_size(30.0)
                 .height(Pixels(50.0))
-                .child_top(Stretch(1.0))
-                .child_bottom(Pixels(0.0))
-                .bottom(Pixels(15.0));
+                .child_top(Stretch(1.0));
 
             // Knobs
             HStack::new(cx, |cx| {
                 // Input gain control
-                // Label::new(cx, "Gain").bottom(Pixels(-1.0));
-                // ParamSlider::new(cx, Data::params, |params| &params.gain);
                 make_knob(cx, params.input_gain.as_ptr(), |params| &params.input_gain);
 
                 // Saturation control
-                // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
-                // ParamSlider::new(cx, Data::params, |params| &params.saturation);
-                make_knob(cx, params.saturation.as_ptr(), |params| &params.saturation);
+                make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
 
+                // Distortion type
+                make_knob(cx, params.distortion_type.as_ptr(), |params| {
+                    &params.distortion_type
+                });
                 // Dry/wet control
-                // Label::new(cx, "Saturation").bottom(Pixels(-1.0));
-                // ParamSlider::new(cx, Data::params, |params| &params.saturation);
                 make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| {
                     &params.dry_wet_ratio
                 });
 
-                // Gain control
-                // Label::new(cx, "Gain").bottom(Pixels(-1.0));
-                // ParamSlider::new(cx, Data::params, |params| &params.gain);
+                // Output gain control
                 make_knob(cx, params.output_gain.as_ptr(), |params| {
                     &params.output_gain
                 });
             })
             .class("knobs")
-            .bottom(Pixels(10.0));
+            .bottom(Pixels(5.0));
 
-            HStack::new(cx, |cx| {
-                // Input gain label
-                Label::new(cx, "Input gain").font_size(15.0);
+            VStack::new(cx, |cx| {
+                VStack::new(cx, |cx| {
+                    // Input gain label
+                    Label::new(cx, "Input gain").font_size(15.0);
 
-                // Input gain meter
-                PeakMeter::new(
-                    cx,
-                    Data::input_peak_meter.map(|input_peak_meter| {
-                        util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
-                    }),
-                    Some(Duration::from_millis(600)),
-                );
+                    // Input gain meter
+                    PeakMeter::new(
+                        cx,
+                        Data::input_peak_meter.map(|input_peak_meter| {
+                            util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
+                        }),
+                        Some(Duration::from_millis(600)),
+                    );
+                })
+                .col_between(Pixels(7.0))
+                .top(Pixels(15.0))
+                .bottom(Pixels(-30.0));
+
+                // Output gain
+                VStack::new(cx, |cx| {
+                    // Output gain label
+                    Label::new(cx, "Output gain").font_size(15.0);
+
+                    // Output gain meter
+                    PeakMeter::new(
+                        cx,
+                        Data::output_peak_meter
+                            .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
+                        Some(Duration::from_millis(600)),
+                    );
+                })
+                .col_between(Pixels(7.0))
+                .bottom(Pixels(10.0));
             })
-            .col_between(Pixels(7.0))
-            .top(Pixels(15.0))
-            .bottom(Pixels(-40.0));
-
-            // Output gain
-            HStack::new(cx, |cx| {
-                // Output gain label
-                Label::new(cx, "Output gain").font_size(15.0);
-
-                // Output gain meter
-                PeakMeter::new(
-                    cx,
-                    Data::output_peak_meter
-                        .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
-                    Some(Duration::from_millis(600)),
-                );
-            })
-            .col_between(Pixels(7.0))
-            .bottom(Pixels(10.0));
+            .child_left(Stretch(1.0))
+            .child_right(Stretch(1.0))
+            .class("gain_meters");
         })
         .row_between(Pixels(0.0))
         .child_left(Stretch(1.0))
