@@ -54,7 +54,7 @@ impl Model for Data {
 
 // Makes sense to also define this here, makes it a bit easier to keep track of
 pub(crate) fn default_state() -> Arc<ViziaState> {
-    ViziaState::from_size(WINDOW_WIDTH, WINDOW_HEIGHT)
+    ViziaState::new(|| (WINDOW_WIDTH, WINDOW_HEIGHT))
 }
 
 pub(crate) fn create(
@@ -91,7 +91,7 @@ pub(crate) fn create(
         VStack::new(cx, |cx| {
             // Title
             Label::new(cx, "croaker")
-                .font(assets::NOTO_SANS_BOLD)
+                // .font(assets::NOTO_SANS_BOLD)
                 .font_size(30.0)
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0));

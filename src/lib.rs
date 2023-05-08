@@ -56,17 +56,9 @@ pub fn process_sample(distortion_type: &DistortionType, drive: f32, input_sample
 pub struct Croaker {
     params: Arc<CroakerParams>,
 
-    /// Needed to normalize the peak meter's response based on the sample rate.
-    output_peak_meter_decay_weight: f32,
-    /// The current data for the peak meter. This is stored as an [`Arc`] so we can share it between
-    /// the GUI and the audio processing parts. If you have more state to share, then it's a good
-    /// idea to put all of that in a struct behind a single `Arc`.
-    ///
-    /// This is stored as voltage gain.
+    // Input/output gain peak meter members
+    peak_meter_decay_weight: f32,
     output_peak_meter: Arc<AtomicF32>,
-
-    // Input gain peak meter members
-    input_peak_meter_decay_weight: f32,
     input_peak_meter: Arc<AtomicF32>,
 
     upsampler: HalfbandFilter,
@@ -101,9 +93,8 @@ impl Default for Croaker {
         Self {
             params: Arc::new(CroakerParams::default()),
 
-            output_peak_meter_decay_weight: 1.0,
+            peak_meter_decay_weight: 1.0,
             output_peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
-            input_peak_meter_decay_weight: 1.0,
             input_peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
 
             upsampler: HalfbandFilter::new(8, true),
@@ -171,26 +162,56 @@ impl Default for CroakerParams {
     }
 }
 
+impl Croaker {
+    pub fn update_peak_meter(
+        &self,
+        amplitude: f32,
+        num_samples: usize,
+        peak_meter: &Arc<AtomicF32>,
+    ) -> f32 {
+        let amplitude = (amplitude / num_samples as f32).abs();
+        let current_peak_meter = peak_meter.load(std::sync::atomic::Ordering::Relaxed);
+        let new_peak_meter = if amplitude > current_peak_meter {
+            amplitude
+        } else {
+            current_peak_meter * self.peak_meter_decay_weight
+                + amplitude * (1.0 - self.peak_meter_decay_weight)
+        };
+
+        peak_meter.store(new_peak_meter, std::sync::atomic::Ordering::Relaxed);
+
+        amplitude
+    }
+}
+
 impl Plugin for Croaker {
-    const NAME: &'static str = "croaker0.1";
+    const NAME: &'static str = "croaker";
     const VENDOR: &'static str = "renzofrog";
     const URL: &'static str = "https://www.renzofrog.com";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
 
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
-    const DEFAULT_INPUT_CHANNELS: u32 = 2;
-    const DEFAULT_OUTPUT_CHANNELS: u32 = 2;
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {
+        main_input_channels: NonZeroU32::new(2),
+        main_output_channels: NonZeroU32::new(2),
+
+        aux_input_ports: &[],
+        aux_output_ports: &[],
+
+        names: PortNames::const_default(),
+    }];
 
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
+    type SysExMessage = ();
     type BackgroundTask = ();
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
     }
 
-    fn editor(&self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         editor::create(
             self.params.clone(),
             self.input_peak_meter.clone(),
@@ -199,28 +220,19 @@ impl Plugin for Croaker {
         )
     }
 
-    fn accepts_bus_config(&self, config: &BusConfig) -> bool {
-        // This works with any symmetrical IO layout
-        config.num_input_channels == config.num_output_channels && config.num_input_channels > 0
-    }
-
     fn initialize(
         &mut self,
-        _bus_config: &BusConfig,
-        buffer_config: &BufferConfig,
+        _audio_io_layout: &AudioIOLayout,
+        _buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
         // After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should
         // have dropped by 12 dB
-        self.input_peak_meter_decay_weight = 0.25f64
-            .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
+        self.peak_meter_decay_weight = 0.25f64
+            .powf((_buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
             as f32;
 
-        self.output_peak_meter_decay_weight = 0.25f64
-            .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
-            as f32;
-
-        let fs = buffer_config.sample_rate;
+        let fs = _buffer_config.sample_rate;
         if fs >= 88200. {
             self.oversample_factor = 1;
         } else {
@@ -242,12 +254,19 @@ impl Plugin for Croaker {
             let dry_wet_ratio = self.params.dry_wet_ratio.smoothed.next();
             let distortion_type = self.params.distortion_type.value();
 
+            // UI variables
+            let mut input_amplitude = 0.0;
+            let mut output_amplitude = 0.0;
+            let num_samples = channel_samples.len();
+
+            // Do processing
             for sample in channel_samples {
                 // Apply DC filter
                 *sample = self.dc_filter.process(*sample);
 
-                // Apply input gain
+                // Apply and visualize input gain
                 *sample *= input_gain;
+                input_amplitude += *sample;
 
                 // Oversample if needed
                 let processed_sample = if self.oversample_factor == 4 {
@@ -278,7 +297,16 @@ impl Plugin for Croaker {
                 let processed_sample =
                     (*sample * (1.0 - dry_wet_ratio)) + (processed_sample * dry_wet_ratio);
 
-                *sample = processed_sample * output_gain;
+                let output = processed_sample * output_gain;
+                output_amplitude += output;
+                *sample = output;
+            }
+
+            // To save resources, a plugin can (and probably should!) only perform expensive
+            // calculations that are only displayed on the GUI while the GUI is open
+            if self.params.editor_state.is_open() {
+                self.update_peak_meter(input_amplitude, num_samples, &self.input_peak_meter);
+                self.update_peak_meter(output_amplitude, num_samples, &self.output_peak_meter);
             }
         }
 
@@ -302,7 +330,9 @@ impl ClapPlugin for Croaker {
 
 impl Vst3Plugin for Croaker {
     const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroaker";
-    const VST3_CATEGORIES: &'static str = "Fx|Distortion";
+
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
+        &[Vst3SubCategory::Fx, Vst3SubCategory::Distortion];
 }
 
 nih_export_vst3!(Croaker);
