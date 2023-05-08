@@ -15,6 +15,7 @@ members = ["xtask"]
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+fx = { git = "https://github.com/renzol2/fx.git" }
 # Remove the `assert_process_allocs` feature to allow allocations on the audio
 # thread in debug builds.
 # nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = ["assert_process_allocs", "standalone"] }

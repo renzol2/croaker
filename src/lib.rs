@@ -1,20 +1,57 @@
 use atomic_float::AtomicF32;
+use fx::{dc_filter::DcFilter, oversampling::HalfbandFilter, waveshapers::*};
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use std::sync::Arc;
 
-pub mod waveshapers;
-use waveshapers::*;
-
-pub mod dc_filter;
-use dc_filter::DcFilter;
-
-pub mod oversampling;
-use oversampling::HalfbandFilter;
-
 mod editor;
 
 const PEAK_METER_DECAY_MS: f64 = 150.0;
+
+#[derive(Enum, Debug, PartialEq, Eq, Clone, Copy)]
+pub enum DistortionType {
+    #[id = "saturation"]
+    #[name = "Saturation"]
+    Saturation,
+
+    #[id = "hard-clipping"]
+    #[name = "Hard clipping"]
+    HardClipping,
+
+    #[id = "fuzzy-rectifier"]
+    #[name = "Fuzzy rectifier"]
+    FuzzyRectifier,
+
+    #[id = "shockley-diode-rectifier"]
+    #[name = "Shockley diode rectifier"]
+    ShockleyDiodeRectifier,
+
+    #[id = "dropout"]
+    #[name = "Dropout"]
+    Dropout,
+
+    #[id = "double-soft-clipper"]
+    #[name = "Double soft clipper"]
+    DoubleSoftClipper,
+
+    #[id = "wavefolding"]
+    #[name = "Wavefolding"]
+    Wavefolding,
+}
+
+pub fn process_sample(distortion_type: &DistortionType, drive: f32, input_sample: f32) -> f32 {
+    match distortion_type {
+        DistortionType::Saturation => get_saturator_output(drive, input_sample),
+        DistortionType::HardClipping => get_hard_clipper_output(drive, input_sample),
+        DistortionType::FuzzyRectifier => get_fuzzy_rectifier_output(drive, input_sample),
+        DistortionType::ShockleyDiodeRectifier => {
+            get_shockley_diode_rectifier_output(drive, input_sample)
+        }
+        DistortionType::Dropout => get_dropout_output(drive, input_sample),
+        DistortionType::DoubleSoftClipper => get_double_soft_clipper_output(drive, input_sample),
+        DistortionType::Wavefolding => get_wavefolder_output(drive, input_sample),
+    }
+}
 
 pub struct Croaker {
     params: Arc<CroakerParams>,
