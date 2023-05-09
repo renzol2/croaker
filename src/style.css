@@ -4,60 +4,68 @@
     Under GPLv3 License
 */
 .container {
-    font-family: 'Fantasque Sans Mono';
-    background-color: #f8f3e4;
+  font-family: "Fantasque Sans Mono";
+  background-color: #f8f3e4;
 }
 
 .waveshaper_selector {
-    font-size: 5px;
-    width: 100;
-    height: auto;
+  font-size: 5px;
+  width: 100;
+  height: auto;
 }
 
 .gain_meters {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    align-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-content: center;
 }
 
-dropdown>popup {
-    background-color: #141414;
-    left: 1s;
-    right: 1s;
+dropdown > popup {
+  background-color: #141414;
+  left: 1s;
+  right: 1s;
 }
 dropdown list label {
-    color: #C2C2C2;
-    border-width: 1px;
-    border-color: #756e6e;
+  color: #c2c2c2;
+  border-width: 1px;
+  border-color: #756e6e;
 }
 
-dropdown>popup>list {
-    width: 250px;
+dropdown > popup > list {
+  width: 250px;
 }
 
 button {
-    width: auto;
-    height: auto;
-    background-color: gray;
-    border-radius: 0px;
+  width: auto;
+  height: auto;
+  background-color: gray;
+  border-radius: 0px;
 }
 
 label {
-    font-size: 15;
-    color: #474747;
-    height: 20px;
+  font-size: 15;
+  color: #474747;
+  height: 20px;
 }
 
 knob {
-    width: 70px;
-    height: 70px;
+  width: 70px;
+  height: 70px;
 }
 
 knob .tick {
-    background-color: #eeece4be;
+  background-color: #eeece4be;
 }
 
 knob .track {
-    background-color: #33c764;
+  background-color: #33c764;
+}
+
+.bypass {
+  padding: 0.25em 0.75em;
+  min-width: 10ch;
+  min-height: 34px;
+  background-color: #ddd6be;
+  border-radius: 10px;
 }

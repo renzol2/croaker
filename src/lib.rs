@@ -109,6 +109,9 @@ struct CroakerParams {
 
     #[id = "distortion-type"]
     pub distortion_type: EnumParam<DistortionType>,
+
+    #[id = "bypass"]
+    pub bypass: BoolParam,
 }
 
 impl Default for Croaker {
@@ -194,6 +197,8 @@ impl Default for CroakerParams {
             .with_value_to_string(formatters::v2s_f32_rounded(2)),
 
             distortion_type: EnumParam::new("Type", DistortionType::Saturation),
+
+            bypass: BoolParam::new("Bypass", false),
         }
     }
 }
@@ -281,6 +286,12 @@ impl Plugin for Croaker {
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
+        if self.params.bypass.value() {
+            self.update_peak_meter(0., buffer.samples(), &self.input_peak_meter);
+            self.update_peak_meter(0., buffer.samples(), &self.output_peak_meter);
+            return ProcessStatus::Normal;
+        }
+
         for mut channel_samples in buffer.iter_samples() {
             let input_gain = self.params.input_gain.smoothed.next();
             let output_gain = self.params.output_gain.smoothed.next();

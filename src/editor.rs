@@ -118,48 +118,71 @@ pub(crate) fn create(
                     &params.output_gain
                 });
             })
+            .child_space(Pixels(5.0))
             .class("knobs")
-            .bottom(Pixels(5.0));
+            .bottom(Pixels(15.0));
 
-            VStack::new(cx, |cx| {
-                // Input gain
+            HStack::new(cx, |cx| {
+                // Meters
                 VStack::new(cx, |cx| {
-                    // Input gain label
-                    Label::new(cx, "Input level").font_size(15.0);
+                    // Input gain
+                    VStack::new(cx, |cx| {
+                        // Input gain label
+                        Label::new(cx, "Input level").font_size(15.0);
 
-                    // Input gain meter
-                    PeakMeter::new(
-                        cx,
-                        Data::input_peak_meter.map(|input_peak_meter| {
-                            util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
-                        }),
-                        Some(Duration::from_millis(600)),
-                    );
+                        // Input gain meter
+                        PeakMeter::new(
+                            cx,
+                            Data::input_peak_meter.map(|input_peak_meter| {
+                                util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
+                            }),
+                            Some(Duration::from_millis(600)),
+                        );
+                    })
+                    .col_between(Pixels(7.0))
+                    .top(Pixels(0.0))
+                    .bottom(Pixels(-20.0));  // meters can be a little closer
+
+                    // Output gain
+                    VStack::new(cx, |cx| {
+                        // Output gain label
+                        Label::new(cx, "Output level").font_size(15.0);
+
+                        // Output gain meter
+                        PeakMeter::new(
+                            cx,
+                            Data::output_peak_meter.map(|peak_meter| {
+                                util::gain_to_db(peak_meter.load(Ordering::Relaxed))
+                            }),
+                            Some(Duration::from_millis(600)),
+                        );
+                    })
+                    .child_space(Pixels(10.0))
+                    .bottom(Pixels(10.0));
                 })
-                .col_between(Pixels(7.0))
-                .top(Pixels(15.0))
-                .bottom(Pixels(-30.0));
+                .child_left(Stretch(1.0))
+                .child_right(Stretch(1.0))
+                .class("gain_meters");
 
-                // Output gain
-                VStack::new(cx, |cx| {
-                    // Output gain label
-                    Label::new(cx, "Output level").font_size(15.0);
-
-                    // Output gain meter
-                    PeakMeter::new(
-                        cx,
-                        Data::output_peak_meter
-                            .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
-                        Some(Duration::from_millis(600)),
-                    );
-                })
-                .child_space(Pixels(10.0))
-                .col_between(Pixels(7.0))
-                .bottom(Pixels(10.0));
+                // Bypass button
+                Button::new(
+                    cx,
+                    |cx| {
+                        // FIXME: doing it this way causes a debug assertion error.
+                        // not sure how to fix this, but it's not breaking anything major...
+                        cx.emit(ParamChangeEvent::SetParam(
+                            Data::params.get(cx).bypass.as_ptr(),
+                            // We pass the opposite value of the current state as a float, because parameter is a float
+                            !Data::params.get(cx).bypass.value() as i32 as f32,
+                        ));
+                    },
+                    |cx| Label::new(cx, "Bypass"),
+                )
+                .top(Pixels(42.0))
+                .class("bypass");
             })
-            .child_left(Stretch(1.0))
-            .child_right(Stretch(1.0))
-            .class("gain_meters");
+            .display(Display::Flex)
+            .col_between(Pixels(10.0));
 
             Label::new(cx, "croaker is a renzofrog plugin. handle with care 💜")
                 .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
