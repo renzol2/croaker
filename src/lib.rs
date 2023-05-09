@@ -111,7 +111,7 @@ impl Default for CroakerParams {
             editor_state: editor::default_state(),
 
             input_gain: FloatParam::new(
-                "Input Gain",
+                "Drive",
                 util::db_to_gain(0.0),
                 FloatRange::Skewed {
                     min: util::db_to_gain(-30.0),
@@ -125,7 +125,7 @@ impl Default for CroakerParams {
             .with_string_to_value(formatters::s2v_f32_gain_to_db()),
 
             output_gain: FloatParam::new(
-                "Output Gain",
+                "Gain",
                 util::db_to_gain(0.0),
                 FloatRange::Skewed {
                     min: util::db_to_gain(-30.0),
@@ -139,7 +139,7 @@ impl Default for CroakerParams {
             .with_string_to_value(formatters::s2v_f32_gain_to_db()),
 
             drive: FloatParam::new(
-                "Drive",
+                "Shape",
                 0.5,
                 FloatRange::Linear {
                     min: 0.0,
@@ -264,9 +264,9 @@ impl Plugin for Croaker {
                 // Apply DC filter
                 *sample = self.dc_filter.process(*sample);
 
-                // Apply and visualize input gain
-                *sample *= input_gain;
+                // Apply input gain after visualizing original input amplitude
                 input_amplitude += *sample;
+                *sample *= input_gain;
 
                 // Oversample if needed
                 let processed_sample = if self.oversample_factor == 4 {

@@ -124,7 +124,7 @@ pub(crate) fn create(
             VStack::new(cx, |cx| {
                 VStack::new(cx, |cx| {
                     // Input gain label
-                    Label::new(cx, "Input gain").font_size(15.0);
+                    Label::new(cx, "Input level").font_size(15.0);
 
                     // Input gain meter
                     PeakMeter::new(
@@ -142,7 +142,7 @@ pub(crate) fn create(
                 // Output gain
                 VStack::new(cx, |cx| {
                     // Output gain label
-                    Label::new(cx, "Output gain").font_size(15.0);
+                    Label::new(cx, "Output level").font_size(15.0);
 
                     // Output gain meter
                     PeakMeter::new(
@@ -179,7 +179,8 @@ where
         Label::new(
             cx,
             Data::params.map(move |params| params_to_param(params).name().to_owned()),
-        );
+        )
+        .bottom(Pixels(7.0));
 
         // Knob
         Knob::custom(
@@ -237,5 +238,5 @@ where
         )
         .width(Pixels(100.));
     })
-    .child_space(Stretch(0.2))
+    .child_space(Stretch(0.1))
 }
