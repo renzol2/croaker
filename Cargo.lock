@@ -232,7 +232,7 @@ dependencies = [
  "uuid",
  "winapi",
  "x11",
- "xcb",
+ "xcb 0.9.0",
  "xcb-util",
 ]
 
@@ -676,6 +676,7 @@ dependencies = [
  "nih_plug",
  "nih_plug_vizia",
  "nih_plug_xtask",
+ "xcb 1.2.1",
 ]
 
 [[package]]
@@ -2059,6 +2060,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-xml"
+version = "0.28.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce5e73202a820a31f8a0ee32ada5e21029c81fd9e3ebf668a40832e4219d9d1"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3325,13 +3335,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "xcb"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b90c622d513012e7419594a2138953603c63848cb189041e7b5dc04d3895da5"
+dependencies = [
+ "bitflags",
+ "libc",
+ "quick-xml",
+]
+
+[[package]]
 name = "xcb-util"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43893e47f27bf7d81d489feef3a0e34a457e90bc314b7e74ad9bb3980e4c1c48"
 dependencies = [
  "libc",
- "xcb",
+ "xcb 0.9.0",
 ]
 
 [[package]]

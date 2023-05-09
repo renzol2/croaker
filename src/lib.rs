@@ -13,11 +13,11 @@ const PEAK_METER_DECAY_MS: f64 = 150.0;
 #[derive(Enum, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum DistortionType {
     #[id = "saturation"]
-    #[name = "Saturation"]
+    #[name = "Saturator"]
     Saturation,
 
     #[id = "hard-clipping"]
-    #[name = "Hard clipping"]
+    #[name = "Hard clipper"]
     HardClipping,
 
     #[id = "fuzzy-rectifier"]
@@ -25,7 +25,7 @@ pub enum DistortionType {
     FuzzyRectifier,
 
     #[id = "shockley-diode-rectifier"]
-    #[name = "Shockley diode rectifier"]
+    #[name = "Diode rectifier"]
     ShockleyDiodeRectifier,
 
     #[id = "dropout"]
@@ -37,7 +37,7 @@ pub enum DistortionType {
     DoubleSoftClipper,
 
     #[id = "wavefolding"]
-    #[name = "Wavefolding"]
+    #[name = "Wavefolder"]
     Wavefolding,
 }
 
