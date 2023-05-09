@@ -2,7 +2,7 @@
 
 > make sound go _croak_
 
-<img width="718" alt="croaker, a plugin that makes sound go croak" src="https://github.com/renzol2/croaker/assets/55109467/6d56cb81-205a-4717-b54b-390b5f402b61">
+<img width="400" alt="croaker, a plugin that makes sound go croak" src="https://github.com/renzol2/croaker/assets/55109467/6d56cb81-205a-4717-b54b-390b5f402b61">
 
 **croaker** is a VST3/CLAP plugin that will make your audio sound like a croaking frog 🐸, or worse (i.e. it's a really badly tuned multi effects plugin).
 
