@@ -1,11 +1,11 @@
 [package]
 name = "croaker"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 authors = ["Renzo Ledesma <renzomledesma@gmail.com>"]
 license = "GPL-3.0-or-later"
 homepage = "renzomledesma.me"
-description = "saturator/distorter/makes sound go croak"
+description = "make sound go croak"
 
 [workspace]
 members = ["xtask"]

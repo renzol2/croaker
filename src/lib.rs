@@ -452,20 +452,18 @@ impl Plugin for Croaker {
 
 impl ClapPlugin for Croaker {
     const CLAP_ID: &'static str = "renzofrog_plugins";
-    const CLAP_DESCRIPTION: Option<&'static str> = Some("saturator/distorter/makes sound go croak");
+    const CLAP_DESCRIPTION: Option<&'static str> = Some("make sound go croak");
     const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
     const CLAP_FEATURES: &'static [ClapFeature] = &[
         ClapFeature::AudioEffect,
         ClapFeature::Stereo,
-        ClapFeature::Mono,
-        ClapFeature::Utility,
         ClapFeature::Distortion,
     ];
 }
 
 impl Vst3Plugin for Croaker {
-    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroake1";
+    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroaker";
 
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
         &[Vst3SubCategory::Fx, Vst3SubCategory::Distortion];
