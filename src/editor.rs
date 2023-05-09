@@ -141,7 +141,7 @@ pub(crate) fn create(
                     })
                     .col_between(Pixels(7.0))
                     .top(Pixels(0.0))
-                    .bottom(Pixels(-20.0));  // meters can be a little closer
+                    .bottom(Pixels(-20.0)); // meters can be a little closer
 
                     // Output gain
                     VStack::new(cx, |cx| {
