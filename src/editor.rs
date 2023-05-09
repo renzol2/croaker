@@ -99,10 +99,10 @@ pub(crate) fn create(
             // Knobs
             HStack::new(cx, |cx| {
                 // Input gain control
-                make_knob(cx, params.input_gain.as_ptr(), |params| &params.input_gain);
+                make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
 
                 // Saturation control
-                make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
+                make_knob(cx, params.shape.as_ptr(), |params| &params.shape);
 
                 // Distortion type
                 make_knob(cx, params.distortion_type.as_ptr(), |params| {
@@ -267,7 +267,7 @@ where
             cx,
             Data::params.map(move |params| params_to_param(params).to_string()),
         )
-        .font_size(13.0)
+        .font_size(12.0)
         .width(Pixels(100.));
     })
     .child_space(Stretch(0.1))

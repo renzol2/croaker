@@ -6,9 +6,11 @@ use std::sync::Arc;
 use fx::{
     biquad::{BiquadFilterType, StereoBiquadFilter},
     dc_filter::DcFilter,
+    delay_line::StereoDelay,
     oversampling::HalfbandFilter,
     waveshapers::*,
-    DEFAULT_SAMPLE_RATE,
+    DEFAULT_SAMPLE_RATE, FLUTTER_MAX_FREQUENCY_RATIO, FLUTTER_MAX_LFO_FREQUENCY,
+    MAX_DELAY_TIME_SECONDS, WOW_MAX_FREQUENCY_RATIO, WOW_MAX_LFO_FREQUENCY,
 };
 
 mod assets;
@@ -82,12 +84,17 @@ pub struct Croaker {
     output_peak_meter: Arc<AtomicF32>,
     input_peak_meter: Arc<AtomicF32>,
 
+    // Distortion
     upsampler: (HalfbandFilter, HalfbandFilter),
     downsampler: (HalfbandFilter, HalfbandFilter),
     dc_filters: (DcFilter, DcFilter),
     prefilter: StereoBiquadFilter,
     postfilter: StereoBiquadFilter,
     oversample_factor: usize,
+
+    // Vibrato
+    wow_vibrato: StereoDelay,
+    flutter_vibrato: StereoDelay,
 }
 
 #[derive(Params)]
@@ -95,21 +102,27 @@ struct CroakerParams {
     #[persist = "editor-state"]
     editor_state: Arc<ViziaState>,
 
-    #[id = "input-gain"]
-    pub input_gain: FloatParam,
-
-    #[id = "output-gain"]
-    pub output_gain: FloatParam,
-
-    #[id = "dry-wet"]
-    pub dry_wet_ratio: FloatParam,
-
+    // Distortion parameters
     #[id = "drive"]
     pub drive: FloatParam,
-
+    #[id = "output-gain"]
+    pub output_gain: FloatParam,
+    #[id = "shape"]
+    pub shape: FloatParam,
     #[id = "distortion-type"]
     pub distortion_type: EnumParam<DistortionType>,
 
+    // Vibrato parameters
+    #[id = "wow"]
+    pub wow: FloatParam,
+    #[id = "flutter"]
+    pub flutter: FloatParam,
+    #[id = "width"]
+    pub width: FloatParam,
+
+    // General parameters
+    #[id = "dry-wet"]
+    pub dry_wet_ratio: FloatParam,
     #[id = "bypass"]
     pub bypass: BoolParam,
 }
@@ -139,7 +152,10 @@ impl Default for Croaker {
             dc_filters: (DcFilter::default(), DcFilter::default()),
             prefilter,
             postfilter,
-            oversample_factor: 4,
+            oversample_factor: OVERSAMPLING_FACTOR,
+
+            wow_vibrato: StereoDelay::new(MAX_DELAY_TIME_SECONDS, DEFAULT_SAMPLE_RATE),
+            flutter_vibrato: StereoDelay::new(MAX_DELAY_TIME_SECONDS, DEFAULT_SAMPLE_RATE),
         }
     }
 }
@@ -149,7 +165,7 @@ impl Default for CroakerParams {
         Self {
             editor_state: editor::default_state(),
 
-            input_gain: FloatParam::new(
+            drive: FloatParam::new(
                 "Drive",
                 util::db_to_gain(0.0),
                 FloatRange::Skewed {
@@ -177,7 +193,7 @@ impl Default for CroakerParams {
             .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
             .with_string_to_value(formatters::s2v_f32_gain_to_db()),
 
-            drive: FloatParam::new(
+            shape: FloatParam::new(
                 "Shape",
                 0.5,
                 FloatRange::Linear {
@@ -190,7 +206,7 @@ impl Default for CroakerParams {
 
             dry_wet_ratio: FloatParam::new(
                 "Dry/wet",
-                0.5,
+                1.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
             )
             .with_smoother(SmoothingStyle::Linear(50.0))
@@ -199,6 +215,34 @@ impl Default for CroakerParams {
             distortion_type: EnumParam::new("Type", DistortionType::Saturation),
 
             bypass: BoolParam::new("Bypass", false),
+
+            wow: FloatParam::new(
+                "Wow",
+                0.2,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 1.0,
+                    factor: FloatRange::skew_factor(-1.0),
+                },
+            )
+            .with_smoother(SmoothingStyle::Exponential(50.0))
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            flutter: FloatParam::new(
+                "Flutter",
+                0.2,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 1.0,
+                    factor: FloatRange::skew_factor(-1.0),
+                },
+            )
+            .with_smoother(SmoothingStyle::Exponential(50.0))
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            width: FloatParam::new("Width", 0.0, FloatRange::Linear { min: 0.0, max: 1.0 })
+                .with_smoother(SmoothingStyle::Exponential(50.0))
+                .with_value_to_string(formatters::v2s_f32_rounded(2)),
         }
     }
 }
@@ -226,7 +270,7 @@ impl Croaker {
 }
 
 impl Plugin for Croaker {
-    const NAME: &'static str = "croaker";
+    const NAME: &'static str = "croaker w/ vibrato test";
     const VENDOR: &'static str = "renzofrog";
     const URL: &'static str = "https://www.renzofrog.com";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
@@ -275,7 +319,7 @@ impl Plugin for Croaker {
         if fs >= 88200. {
             self.oversample_factor = 1;
         } else {
-            self.oversample_factor = 4;
+            self.oversample_factor = OVERSAMPLING_FACTOR;
         }
         true
     }
@@ -286,6 +330,7 @@ impl Plugin for Croaker {
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
+        // If the plugin is bypassed, stop updating the meters and prevent processing
         if self.params.bypass.value() {
             self.update_peak_meter(0., buffer.samples(), &self.input_peak_meter);
             self.update_peak_meter(0., buffer.samples(), &self.output_peak_meter);
@@ -293,11 +338,18 @@ impl Plugin for Croaker {
         }
 
         for mut channel_samples in buffer.iter_samples() {
-            let input_gain = self.params.input_gain.smoothed.next();
-            let output_gain = self.params.output_gain.smoothed.next();
+            // Distortion parameters
             let drive = self.params.drive.smoothed.next();
+            let output_gain = self.params.output_gain.smoothed.next();
+            let shape = self.params.shape.smoothed.next();
             let dry_wet_ratio = self.params.dry_wet_ratio.smoothed.next();
             let distortion_type = self.params.distortion_type.value();
+
+            // Vibrato parameters
+            let wow = self.params.wow.smoothed.next();
+            let flutter = self.params.flutter.smoothed.next();
+            let width = self.params.width.smoothed.next();
+            let phase_offset = width * 0.5; // only offset right phase by a maximum of 180 degrees
 
             // UI variables
             let mut input_amplitude = 0.0;
@@ -310,8 +362,8 @@ impl Plugin for Croaker {
             input_amplitude += in_l + in_r;
 
             // Remove DC offset
-            let processed_l = self.dc_filters.0.process(in_l) * input_gain;
-            let processed_r = self.dc_filters.1.process(in_r) * input_gain;
+            let processed_l = self.dc_filters.0.process(in_l) * drive;
+            let processed_r = self.dc_filters.1.process(in_r) * drive;
 
             // Apply processing
             let (wet_l, wet_r) = if self.oversample_factor == OVERSAMPLING_FACTOR {
@@ -330,13 +382,37 @@ impl Plugin for Croaker {
                     frame_r[i] = prefiltered.1;
 
                     // Apply distortion
-                    frame_l[i] = distort_sample(&distortion_type, drive, frame_l[i]);
-                    frame_r[i] = distort_sample(&distortion_type, drive, frame_r[i]);
+                    frame_l[i] = distort_sample(&distortion_type, shape, frame_l[i]);
+                    frame_r[i] = distort_sample(&distortion_type, shape, frame_r[i]);
 
                     // Apply post-filtering
                     let postfiltered = self.postfilter.process((frame_l[i], frame_r[i]));
                     frame_l[i] = postfiltered.0;
                     frame_r[i] = postfiltered.1;
+
+                    if wow > 0.0 {
+                        let wow_processed_samples = self.wow_vibrato.process_with_vibrato(
+                            (frame_l[i], frame_r[i]),
+                            WOW_MAX_LFO_FREQUENCY / OVERSAMPLING_FACTOR as f32,
+                            wow * WOW_MAX_FREQUENCY_RATIO / (OVERSAMPLING_FACTOR as f32).powf(2.),
+                            phase_offset,
+                        );
+                        frame_l[i] = wow_processed_samples.0;
+                        frame_r[i] = wow_processed_samples.1;
+                    }
+
+                    // Apply flutter
+                    if flutter > 0.0 {
+                        let flutter_processed_samples = self.flutter_vibrato.process_with_vibrato(
+                            (frame_l[i], frame_r[i]),
+                            FLUTTER_MAX_LFO_FREQUENCY / OVERSAMPLING_FACTOR as f32,
+                            flutter * FLUTTER_MAX_FREQUENCY_RATIO
+                                / (OVERSAMPLING_FACTOR as f32).powf(2.),
+                            phase_offset,
+                        );
+                        frame_l[i] = flutter_processed_samples.0;
+                        frame_r[i] = flutter_processed_samples.1;
+                    }
 
                     // Downsample through half-band filter
                     frame_l[i] = self.downsampler.0.process(frame_l[i]);
@@ -345,8 +421,9 @@ impl Plugin for Croaker {
 
                 (frame_l[0], frame_r[0])
             } else {
-                let distorted_l = distort_sample(&distortion_type, drive, processed_l);
-                let distorted_r = distort_sample(&distortion_type, drive, processed_r);
+                let distorted_l = distort_sample(&distortion_type, shape, processed_l);
+                let distorted_r = distort_sample(&distortion_type, shape, processed_r);
+                // TODO: add wow/flutter
                 (distorted_l, distorted_r)
             };
 
@@ -388,10 +465,11 @@ impl ClapPlugin for Croaker {
 }
 
 impl Vst3Plugin for Croaker {
-    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroaker";
+    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroake1";
 
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
         &[Vst3SubCategory::Fx, Vst3SubCategory::Distortion];
 }
 
+// We can also export to CLAP plugin format
 nih_export_vst3!(Croaker);
