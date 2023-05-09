@@ -26,7 +26,7 @@ nih_plug_xtask = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default_features = false, features = ["assert_process_allocs", "standalone"] }
 atomic_float = "0.1"
 approx = "0.5.1"
-xcb = "1.0.0"
+xcb = "1.0.0"  # security
 
 [profile.release]
 lto = "thin"
