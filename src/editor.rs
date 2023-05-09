@@ -2,12 +2,13 @@ use atomic_float::AtomicF32;
 use nih_plug::prelude::{util, Editor, GuiContext, Param, ParamPtr};
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::widgets::*;
-use nih_plug_vizia::{assets, create_vizia_editor, ViziaState, ViziaTheming};
+use nih_plug_vizia::{create_vizia_editor, ViziaState, ViziaTheming};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use std::vec;
 
+use crate::assets::{register_fantasque_sans_mono, FANTASQUE_SANS_MONO};
 use crate::CroakerParams;
 
 const STYLE: &str = include_str!("style.css");
@@ -64,8 +65,7 @@ pub(crate) fn create(
     editor_state: Arc<ViziaState>,
 ) -> Option<Box<dyn Editor>> {
     create_vizia_editor(editor_state, ViziaTheming::Custom, move |cx, context| {
-        assets::register_noto_sans_light(cx);
-        assets::register_noto_sans_thin(cx);
+        register_fantasque_sans_mono(cx);
         cx.add_theme(STYLE);
 
         Data {
@@ -74,12 +74,12 @@ pub(crate) fn create(
             input_peak_meter: input_peak_meter.clone(),
             output_peak_meter: output_peak_meter.clone(),
             distortion_types: vec![
-                "Saturation".to_string(),
-                "Hard clipping".to_string(),
+                "Saturate".to_string(),
+                "Hard clip".to_string(),
                 "Fuzzy rectifier".to_string(),
-                "Shockley diode rectifier".to_string(),
+                "Diode rectifier".to_string(),
                 "Dropout".to_string(),
-                "Double soft clipper".to_string(),
+                "Double soft clip".to_string(),
                 "Wavefolder".to_string(),
             ],
         }
@@ -90,8 +90,8 @@ pub(crate) fn create(
         // UI
         VStack::new(cx, |cx| {
             // Title
-            Label::new(cx, "croaker")
-                // .font(assets::NOTO_SANS_BOLD)
+            Label::new(cx, "🐸🌱")
+                .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
                 .font_size(30.0)
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0));
@@ -122,6 +122,7 @@ pub(crate) fn create(
             .bottom(Pixels(5.0));
 
             VStack::new(cx, |cx| {
+                // Input gain
                 VStack::new(cx, |cx| {
                     // Input gain label
                     Label::new(cx, "Input level").font_size(15.0);
@@ -158,6 +159,12 @@ pub(crate) fn create(
             .child_left(Stretch(1.0))
             .child_right(Stretch(1.0))
             .class("gain_meters");
+
+            Label::new(cx, "croaker is a renzofrog plugin. handle with care 💜")
+                .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
+                .font_style(FontStyle::Italic)
+                .font_size(10.0)
+                .child_bottom(Stretch(1.0));
         })
         .row_between(Pixels(0.0))
         .child_left(Stretch(1.0))
@@ -236,6 +243,7 @@ where
             cx,
             Data::params.map(move |params| params_to_param(params).to_string()),
         )
+        .font_size(13.0)
         .width(Pixels(100.));
     })
     .child_space(Stretch(0.1))

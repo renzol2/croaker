@@ -4,7 +4,9 @@ use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use std::sync::Arc;
 
+mod assets;
 mod editor;
+mod fonts;
 
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
