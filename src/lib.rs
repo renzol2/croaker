@@ -218,11 +218,11 @@ impl Default for CroakerParams {
 
             wow: FloatParam::new(
                 "Wow",
-                0.2,
+                0.05,
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 1.0,
-                    factor: FloatRange::skew_factor(-1.0),
+                    factor: FloatRange::skew_factor(-1.5),
                 },
             )
             .with_smoother(SmoothingStyle::Exponential(50.0))
@@ -230,11 +230,11 @@ impl Default for CroakerParams {
 
             flutter: FloatParam::new(
                 "Flutter",
-                0.2,
+                0.1,
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 1.0,
-                    factor: FloatRange::skew_factor(-1.0),
+                    factor: FloatRange::skew_factor(-1.5),
                 },
             )
             .with_smoother(SmoothingStyle::Exponential(50.0))
