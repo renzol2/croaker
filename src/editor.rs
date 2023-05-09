@@ -13,7 +13,7 @@ use crate::CroakerParams;
 
 const STYLE: &str = include_str!("style.css");
 pub const WINDOW_WIDTH: u32 = 550;
-pub const WINDOW_HEIGHT: u32 = 380;
+pub const WINDOW_HEIGHT: u32 = 600;
 
 #[derive(Lens)]
 struct Data {
@@ -90,27 +90,31 @@ pub(crate) fn create(
         // UI
         VStack::new(cx, |cx| {
             // Title
-            Label::new(cx, "🐸🌱")
+            Label::new(cx, "🐸🌱💫")
                 .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
                 .font_size(30.0)
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0));
 
-            // Knobs
+            // Distortion knobs
+            Label::new(cx, "Distortion")
+                .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
+                .font_size(15.0)
+                .height(Pixels(50.0))
+                .font_weight(Weight::BOLD)
+                .child_top(Stretch(1.0))
+                .top(Pixels(-10.0))
+                .bottom(Pixels(-10.0));
             HStack::new(cx, |cx| {
                 // Input gain control
-                make_knob(cx, params.input_gain.as_ptr(), |params| &params.input_gain);
+                make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
 
                 // Saturation control
-                make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
+                make_knob(cx, params.shape.as_ptr(), |params| &params.shape);
 
                 // Distortion type
                 make_knob(cx, params.distortion_type.as_ptr(), |params| {
                     &params.distortion_type
-                });
-                // Dry/wet control
-                make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| {
-                    &params.dry_wet_ratio
                 });
 
                 // Output gain control
@@ -119,6 +123,34 @@ pub(crate) fn create(
                 });
             })
             .child_space(Pixels(5.0))
+            .bottom(Pixels(-10.0))
+            .class("knobs");
+
+            // Vibrato knobs
+            Label::new(cx, "Tape")
+                .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
+                .font_size(15.0)
+                .height(Pixels(50.0))
+                .font_weight(Weight::BOLD)
+                .child_top(Stretch(1.0))
+                .top(Pixels(-20.0))
+                .bottom(Pixels(-10.0));
+            HStack::new(cx, |cx| {
+                // Wow control
+                make_knob(cx, params.wow.as_ptr(), |params| &params.wow);
+
+                // Flutter control
+                make_knob(cx, params.flutter.as_ptr(), |params| &params.flutter);
+
+                // Width control
+                make_knob(cx, params.width.as_ptr(), |params| &params.width);
+
+                // Dry/wet control
+                make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| {
+                    &params.dry_wet_ratio
+                });
+            })
+            .child_space(Pixels(4.0))
             .class("knobs")
             .bottom(Pixels(15.0));
 
@@ -267,7 +299,7 @@ where
             cx,
             Data::params.map(move |params| params_to_param(params).to_string()),
         )
-        .font_size(13.0)
+        .font_size(11.0)
         .width(Pixels(100.));
     })
     .child_space(Stretch(0.1))

@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "croaker"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "approx",
  "atomic_float",
@@ -963,7 +963,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "fx"
 version = "0.0.1"
-source = "git+https://github.com/renzol2/fx.git#d409cba097b342f2d01f69aafc1bd9232e266942"
+source = "git+https://github.com/renzol2/fx.git#4a0a2266a149574520f092e9183f965d9d168b21"
 dependencies = [
  "approx",
 ]
