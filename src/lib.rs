@@ -1,16 +1,29 @@
 use atomic_float::AtomicF32;
-use fx::{dc_filter::DcFilter, oversampling::HalfbandFilter, waveshapers::*};
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use std::sync::Arc;
+
+use fx::{
+    biquad::{BiquadFilterType, StereoBiquadFilter},
+    dc_filter::DcFilter,
+    oversampling::HalfbandFilter,
+    waveshapers::*,
+    DEFAULT_SAMPLE_RATE,
+};
 
 mod assets;
 mod editor;
 mod fonts;
 
+/// After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should have dropped by 12 dB
 const PEAK_METER_DECAY_MS: f64 = 150.0;
+/// The cutoff frequency for pre/post filtering
+const FILTER_CUTOFF_HZ: f32 = 8000.0;
+/// Multiplier to oversample by
+const OVERSAMPLING_FACTOR: usize = 4;
 
 #[derive(Enum, Debug, PartialEq, Eq, Clone, Copy)]
+/// Distortion algorithms available in plugin
 pub enum DistortionType {
     #[id = "saturation"]
     #[name = "Saturator"]
@@ -19,6 +32,10 @@ pub enum DistortionType {
     #[id = "hard-clipping"]
     #[name = "Hard clipper"]
     HardClipping,
+
+    #[id = "harder-clipping"]
+    #[name = "Harder clipper"]
+    HarderClipping,
 
     #[id = "fuzzy-rectifier"]
     #[name = "Fuzzy rectifier"]
@@ -41,10 +58,12 @@ pub enum DistortionType {
     Wavefolding,
 }
 
-pub fn process_sample(distortion_type: &DistortionType, drive: f32, input_sample: f32) -> f32 {
+/// Run sample through nonlinear waveshapers from `fx` depending on the distortion type
+pub fn distort_sample(distortion_type: &DistortionType, drive: f32, input_sample: f32) -> f32 {
     match distortion_type {
         DistortionType::Saturation => get_saturator_output(drive, input_sample),
         DistortionType::HardClipping => get_hard_clipper_output(drive, input_sample),
+        DistortionType::HarderClipping => get_saturating_hard_clipper_output(drive, input_sample),
         DistortionType::FuzzyRectifier => get_fuzzy_rectifier_output(drive, input_sample),
         DistortionType::ShockleyDiodeRectifier => {
             get_shockley_diode_rectifier_output(drive, input_sample)
@@ -63,9 +82,11 @@ pub struct Croaker {
     output_peak_meter: Arc<AtomicF32>,
     input_peak_meter: Arc<AtomicF32>,
 
-    upsampler: HalfbandFilter,
-    downsampler: HalfbandFilter,
-    dc_filter: DcFilter,
+    upsampler: (HalfbandFilter, HalfbandFilter),
+    downsampler: (HalfbandFilter, HalfbandFilter),
+    dc_filters: (DcFilter, DcFilter),
+    prefilter: StereoBiquadFilter,
+    postfilter: StereoBiquadFilter,
     oversample_factor: usize,
 }
 
@@ -92,6 +113,17 @@ struct CroakerParams {
 
 impl Default for Croaker {
     fn default() -> Self {
+        // Setup filters
+        let mut prefilter = StereoBiquadFilter::new();
+        let mut postfilter = StereoBiquadFilter::new();
+
+        // Biquad parameters tuned by ear
+        let fc = FILTER_CUTOFF_HZ / DEFAULT_SAMPLE_RATE as f32; // hz, using default sample rate
+        let gain = 18.0; // dB
+        let q = 0.1;
+        prefilter.set_biquads(BiquadFilterType::HighShelf, fc, q, gain);
+        postfilter.set_biquads(BiquadFilterType::LowShelf, fc, q, -gain);
+
         Self {
             params: Arc::new(CroakerParams::default()),
 
@@ -99,9 +131,11 @@ impl Default for Croaker {
             output_peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             input_peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
 
-            upsampler: HalfbandFilter::new(8, true),
-            downsampler: HalfbandFilter::new(8, true),
-            dc_filter: DcFilter::default(),
+            upsampler: (HalfbandFilter::new(8, true), HalfbandFilter::new(8, true)),
+            downsampler: (HalfbandFilter::new(8, true), HalfbandFilter::new(8, true)),
+            dc_filters: (DcFilter::default(), DcFilter::default()),
+            prefilter,
+            postfilter,
             oversample_factor: 4,
         }
     }
@@ -228,8 +262,6 @@ impl Plugin for Croaker {
         _buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
-        // After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should
-        // have dropped by 12 dB
         self.peak_meter_decay_weight = 0.25f64
             .powf((_buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
             as f32;
@@ -249,7 +281,7 @@ impl Plugin for Croaker {
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
-        for channel_samples in buffer.iter_samples() {
+        for mut channel_samples in buffer.iter_samples() {
             let input_gain = self.params.input_gain.smoothed.next();
             let output_gain = self.params.output_gain.smoothed.next();
             let drive = self.params.drive.smoothed.next();
@@ -261,51 +293,65 @@ impl Plugin for Croaker {
             let mut output_amplitude = 0.0;
             let num_samples = channel_samples.len();
 
-            // Do processing
-            for sample in channel_samples {
-                // Apply DC filter
-                *sample = self.dc_filter.process(*sample);
+            // Get input signal, and update input peak meter value
+            let in_l = *channel_samples.get_mut(0).unwrap();
+            let in_r = *channel_samples.get_mut(1).unwrap();
+            input_amplitude += in_l + in_r;
 
-                // Apply input gain after visualizing original input amplitude
-                input_amplitude += *sample;
-                *sample *= input_gain;
+            // Remove DC offset
+            let processed_l = self.dc_filters.0.process(in_l) * input_gain;
+            let processed_r = self.dc_filters.1.process(in_r) * input_gain;
 
-                // Oversample if needed
-                let processed_sample = if self.oversample_factor == 4 {
-                    // Zero-stuff
-                    let input = *sample;
-                    let mut frame = [input, 0., 0., 0.];
+            // Apply processing
+            let (wet_l, wet_r) = if self.oversample_factor == OVERSAMPLING_FACTOR {
+                // Begin upsampling block
+                let mut frame_l = [processed_l, 0., 0., 0.];
+                let mut frame_r = [processed_r, 0., 0., 0.];
 
-                    // Apply processing
-                    for i in 0..frame.len() {
-                        // Run input through half-band filter
-                        frame[i] = self.upsampler.process(frame[i]);
+                for i in 0..OVERSAMPLING_FACTOR {
+                    // Upsample
+                    frame_l[i] = self.upsampler.0.process(frame_l[i]);
+                    frame_r[i] = self.upsampler.1.process(frame_r[i]);
 
-                        // Apply distortion
-                        let wet = process_sample(&distortion_type, drive, frame[i]);
+                    // Apply pre-filtering
+                    let prefiltered = self.prefilter.process((frame_l[i], frame_r[i]));
+                    frame_l[i] = prefiltered.0;
+                    frame_r[i] = prefiltered.1;
 
-                        // Downsample through half-band filter
-                        frame[i] = self.downsampler.process(wet);
-                    }
+                    // Apply distortion
+                    frame_l[i] = distort_sample(&distortion_type, drive, frame_l[i]);
+                    frame_r[i] = distort_sample(&distortion_type, drive, frame_r[i]);
 
-                    // Get output after downsampling
-                    frame[0]
-                } else {
-                    // Don't oversample if not needed
-                    process_sample(&distortion_type, drive, *sample)
-                };
+                    // Apply post-filtering
+                    let postfiltered = self.postfilter.process((frame_l[i], frame_r[i]));
+                    frame_l[i] = postfiltered.0;
+                    frame_r[i] = postfiltered.1;
 
-                // Apply dry/wet and rewrite buffer
-                let processed_sample =
-                    (*sample * (1.0 - dry_wet_ratio)) + (processed_sample * dry_wet_ratio);
+                    // Downsample through half-band filter
+                    frame_l[i] = self.downsampler.0.process(frame_l[i]);
+                    frame_r[i] = self.downsampler.1.process(frame_r[i]);
+                }
 
-                let output = processed_sample * output_gain;
-                output_amplitude += output;
-                *sample = output;
-            }
+                (frame_l[0], frame_r[0])
+            } else {
+                let distorted_l = distort_sample(&distortion_type, drive, processed_l);
+                let distorted_r = distort_sample(&distortion_type, drive, processed_r);
+                (distorted_l, distorted_r)
+            };
 
-            // To save resources, a plugin can (and probably should!) only perform expensive
-            // calculations that are only displayed on the GUI while the GUI is open
+            // Apply dry/wet
+            let out_l = (in_l * (1.0 - dry_wet_ratio)) + (wet_l * dry_wet_ratio);
+            let out_r = (in_r * (1.0 - dry_wet_ratio)) + (wet_r * dry_wet_ratio);
+
+            // Apply output gain, and update output peak meter value
+            let out_l = out_l * output_gain;
+            let out_r = out_r * output_gain;
+            output_amplitude += out_l + out_r;
+
+            *channel_samples.get_mut(0).unwrap() = out_l;
+            *channel_samples.get_mut(1).unwrap() = out_r;
+
+            // Update peak meters if UI is open
             if self.params.editor_state.is_open() {
                 self.update_peak_meter(input_amplitude, num_samples, &self.input_peak_meter);
                 self.update_peak_meter(output_amplitude, num_samples, &self.output_peak_meter);

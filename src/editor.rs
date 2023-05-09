@@ -153,6 +153,7 @@ pub(crate) fn create(
                         Some(Duration::from_millis(600)),
                     );
                 })
+                .child_space(Pixels(10.0))
                 .col_between(Pixels(7.0))
                 .bottom(Pixels(10.0));
             })
