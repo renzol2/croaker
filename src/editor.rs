@@ -245,6 +245,13 @@ where
         )
         .bottom(Pixels(7.0));
 
+        // Units
+        Label::new(
+            cx,
+            Data::params.map(move |params| params_to_param(params).to_string()),
+        )
+        .font_size(11.0);
+
         // Knob
         Knob::custom(
             cx,
@@ -293,14 +300,9 @@ where
                 ParamChangeEvent::EndSet(param_ptr),
             )
         });
-
-        // Units
-        Label::new(
-            cx,
-            Data::params.map(move |params| params_to_param(params).to_string()),
-        )
-        .font_size(11.0)
-        .width(Pixels(100.));
     })
     .child_space(Stretch(0.1))
+    .child_left(Stretch(1.0))
+    .child_right(Stretch(1.0))
+    .width(Pixels(90.))
 }

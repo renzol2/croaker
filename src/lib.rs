@@ -1,6 +1,7 @@
 use atomic_float::AtomicF32;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use fx::{
@@ -95,6 +96,12 @@ pub struct Croaker {
     // Vibrato
     wow_vibrato: StereoDelay,
     flutter_vibrato: StereoDelay,
+
+    // Filter section
+    lpf: StereoBiquadFilter,
+    should_update_lpf: Arc<AtomicBool>,
+    hpf: StereoBiquadFilter,
+    should_update_hpf: Arc<AtomicBool>,
 }
 
 #[derive(Params)]
@@ -120,6 +127,14 @@ struct CroakerParams {
     #[id = "width"]
     pub width: FloatParam,
 
+    // Filter section parameters
+    #[id = "lpf-freq"]
+    pub lpf_freq: FloatParam,
+    #[id = "hpf-freq"]
+    pub hpf_freq: FloatParam,
+    #[id = "resonance"]
+    pub resonance: FloatParam,
+
     // General parameters
     #[id = "dry-wet"]
     pub dry_wet_ratio: FloatParam,
@@ -129,7 +144,7 @@ struct CroakerParams {
 
 impl Default for Croaker {
     fn default() -> Self {
-        // Setup filters
+        // Setup distortion pre/post filters
         let mut prefilter = StereoBiquadFilter::new();
         let mut postfilter = StereoBiquadFilter::new();
 
@@ -140,8 +155,23 @@ impl Default for Croaker {
         prefilter.set_biquads(BiquadFilterType::HighShelf, fc, q, gain);
         postfilter.set_biquads(BiquadFilterType::LowShelf, fc, q, -gain);
 
+        // Setup filter-section filters
+        let mut lpf = StereoBiquadFilter::new();
+        let mut hpf = StereoBiquadFilter::new();
+
+        // Biquad parameters tuned by ear
+        lpf.set_filter_type(BiquadFilterType::LowPass);
+        hpf.set_filter_type(BiquadFilterType::HighPass);
+
+        // Thread-shared variables
+        let should_update_lpf = Arc::new(AtomicBool::new(true));
+        let should_update_hpf = Arc::new(AtomicBool::new(true));
+
         Self {
-            params: Arc::new(CroakerParams::default()),
+            params: Arc::new(CroakerParams::new(
+                should_update_lpf.clone(),
+                should_update_hpf.clone(),
+            )),
 
             peak_meter_decay_weight: 1.0,
             output_peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
@@ -156,12 +186,17 @@ impl Default for Croaker {
 
             wow_vibrato: StereoDelay::new(MAX_DELAY_TIME_SECONDS, DEFAULT_SAMPLE_RATE),
             flutter_vibrato: StereoDelay::new(MAX_DELAY_TIME_SECONDS, DEFAULT_SAMPLE_RATE),
+
+            lpf,
+            should_update_lpf,
+            hpf,
+            should_update_hpf,
         }
     }
 }
 
-impl Default for CroakerParams {
-    fn default() -> Self {
+impl CroakerParams {
+    fn new(should_update_lpf: Arc<AtomicBool>, should_update_hpf: Arc<AtomicBool>) -> Self {
         Self {
             editor_state: editor::default_state(),
 
@@ -243,6 +278,60 @@ impl Default for CroakerParams {
             width: FloatParam::new("Width", 0.0, FloatRange::Linear { min: 0.0, max: 1.0 })
                 .with_smoother(SmoothingStyle::Exponential(50.0))
                 .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            lpf_freq: FloatParam::new(
+                "LPF Freq.",
+                20_000.,
+                FloatRange::Skewed {
+                    min: 15.0,
+                    max: 22_000.0,
+                    factor: FloatRange::skew_factor(-2.2),
+                },
+            )
+            .with_callback(Arc::new({
+                let should_update_lpf = should_update_lpf.clone();
+                move |_| should_update_lpf.store(true, Ordering::SeqCst)
+            }))
+            .with_smoother(SmoothingStyle::Logarithmic(20.0))
+            .with_unit(" Hz")
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            hpf_freq: FloatParam::new(
+                "HPF Freq.",
+                20.,
+                FloatRange::Skewed {
+                    min: 15.0,
+                    max: 22_000.0,
+                    factor: FloatRange::skew_factor(-2.2),
+                },
+            )
+            .with_callback(Arc::new({
+                let should_update_hpf = should_update_hpf.clone();
+                move |_| should_update_hpf.store(true, Ordering::SeqCst)
+            }))
+            .with_smoother(SmoothingStyle::Logarithmic(20.0))
+            .with_unit(" Hz")
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            resonance: FloatParam::new(
+                "Resonance",
+                0.7,
+                FloatRange::Skewed {
+                    min: 0.1,
+                    max: 18.0,
+                    factor: FloatRange::skew_factor(-2.2),
+                },
+            )
+            .with_callback(Arc::new({
+                let should_update_lpf = should_update_lpf.clone();
+                let should_update_hpf = should_update_hpf.clone();
+                move |_| {
+                    should_update_lpf.store(true, Ordering::SeqCst);
+                    should_update_hpf.store(true, Ordering::SeqCst);
+                }
+            }))
+            .with_smoother(SmoothingStyle::Logarithmic(20.0))
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
         }
     }
 }
@@ -267,10 +356,44 @@ impl Croaker {
 
         amplitude
     }
+
+    pub fn check_and_update_filter_coefficients(&mut self, sample_rate: f32) {
+        let q = self.params.resonance.smoothed.next();
+        self.update_lpf_coefficients(sample_rate, q);
+        self.update_hpf_coefficients(sample_rate, q);
+    }
+
+    pub fn update_hpf_coefficients(&mut self, sample_rate: f32, q: f32) {
+        // Check if we should update HPF coefficients
+        if self
+            .should_update_hpf
+            .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            let frequency = self.params.hpf_freq.smoothed.next();
+            let fc = frequency / sample_rate;
+
+            self.hpf.set_biquads(BiquadFilterType::HighPass, fc, q, 0.0);
+        }
+    }
+
+    pub fn update_lpf_coefficients(&mut self, sample_rate: f32, q: f32) {
+        // Check if we should update LPF coefficients
+        if self
+            .should_update_lpf
+            .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            let frequency = self.params.lpf_freq.smoothed.next();
+            let fc = frequency / sample_rate;
+
+            self.lpf.set_biquads(BiquadFilterType::LowPass, fc, q, 0.0);
+        }
+    }
 }
 
 impl Plugin for Croaker {
-    const NAME: &'static str = "croaker";
+    const NAME: &'static str = "croaker filter test";
     const VENDOR: &'static str = "renzofrog";
     const URL: &'static str = "https://www.renzofrog.com";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
@@ -337,7 +460,23 @@ impl Plugin for Croaker {
             return ProcessStatus::Normal;
         }
 
+        let sample_rate = _context.transport().sample_rate;
+        self.check_and_update_filter_coefficients(sample_rate);
+
         for mut channel_samples in buffer.iter_samples() {
+            // Update filter section while smoothing
+            if self.params.resonance.smoothed.is_smoothing() {
+                let q = self.params.resonance.smoothed.next();
+                self.lpf.set_q(q);
+                self.hpf.set_q(q);
+            }
+            if self.params.lpf_freq.smoothed.is_smoothing() {
+                self.lpf.set_fc(self.params.lpf_freq.smoothed.next() / sample_rate);
+            }
+            if self.params.hpf_freq.smoothed.is_smoothing() {
+                self.hpf.set_fc(self.params.hpf_freq.smoothed.next() / sample_rate);
+            }
+
             // Distortion parameters
             let drive = self.params.drive.smoothed.next();
             let output_gain = self.params.output_gain.smoothed.next();
@@ -431,6 +570,10 @@ impl Plugin for Croaker {
             let out_l = (in_l * (1.0 - dry_wet_ratio)) + (wet_l * dry_wet_ratio);
             let out_r = (in_r * (1.0 - dry_wet_ratio)) + (wet_r * dry_wet_ratio);
 
+            // Run signal through filter section
+            let (out_l, out_r) = self.lpf.process((out_l, out_r));
+            let (out_l, out_r) = self.hpf.process((out_l, out_r));
+
             // Apply output gain, and update output peak meter value
             let out_l = out_l * output_gain;
             let out_r = out_r * output_gain;
@@ -463,7 +606,7 @@ impl ClapPlugin for Croaker {
 }
 
 impl Vst3Plugin for Croaker {
-    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroaker";
+    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroake2";
 
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
         &[Vst3SubCategory::Fx, Vst3SubCategory::Distortion];
