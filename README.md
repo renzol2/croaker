@@ -15,6 +15,16 @@
 
 this project is being completed partially in fulfillment of the senior capstone requirement for the [ Computer Science + Music degree program ](https://music.illinois.edu/admission/undergraduate-programs-and-application/undergraduate-degrees/bachelor-of-science-cs-music/) at the University of Illinois at Urbana-Champaign.
 
+## Download
+
+A temporary download link to standalone, VST3, and CLAP versions can be found here: [Google Drive](https://drive.google.com/drive/folders/1MUqEvY7qZCM-ucpszpEqc7d3vIfdQkVw?usp=sharing)
+
+I have only tested plugin on macOS Monterey 12.5 using Audacity and Ableton Live 11. I haven't been able to run this on Reason 12. Also, since I don't have an Apple Developer account (yet), I haven't codesigned these applications. So, you'll need to codesign yourself. Here are some useful links:
+
+- <https://www.osirisguitar.com/how-to-make-unsigned-vsts-work-in-macos-catalina/>
+- <https://forum.cabbageaudio.com/t/how-to-codesign-osx-plugins/3079>
+- <https://melatonin.dev/blog/how-to-code-sign-and-notarize-macos-audio-plugins-in-ci/>
+
 ## Building
 
 After installing [Rust](https://rustup.rs/), you can compile croaker as follows:
