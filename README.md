@@ -2,7 +2,7 @@
 
 > make sound go _croak_
 
-<img width="930" alt="croaker, a plugin that makes sound go croak" src="https://github.com/renzol2/croaker/assets/55109467/76ed3f78-481c-46cf-8691-b3b0c2260c89">
+<img width="899" alt="croaker, a plugin that makes sound go croak" src="https://github.com/renzol2/croaker/assets/55109467/3028d5ca-27b5-4c69-9fb1-c21d42aabd2c">
 
 ## About
 
