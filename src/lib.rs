@@ -1,4 +1,5 @@
 use atomic_float::AtomicF32;
+use fx::moorer_verb::MoorerReverb;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -97,6 +98,9 @@ pub struct Croaker {
     wow_vibrato: StereoDelay,
     flutter_vibrato: StereoDelay,
 
+    // Reverb section
+    reverb: MoorerReverb,
+
     // Filter section
     lpf: StereoBiquadFilter,
     should_update_lpf: Arc<AtomicBool>,
@@ -126,6 +130,16 @@ struct CroakerParams {
     pub flutter: FloatParam,
     #[id = "width"]
     pub width: FloatParam,
+
+    // Reverb parameters
+    #[id = "reverb-dry-wet"]
+    pub reverb_dry_wet: FloatParam,
+    #[id = "room-size"]
+    pub room_size: FloatParam,
+    #[id = "dampening"]
+    pub damping: FloatParam,
+    #[id = "reverb_width"]
+    pub reverb_width: FloatParam,
 
     // Filter section parameters
     #[id = "lpf-freq"]
@@ -186,6 +200,8 @@ impl Default for Croaker {
 
             wow_vibrato: StereoDelay::new(MAX_DELAY_TIME_SECONDS, DEFAULT_SAMPLE_RATE),
             flutter_vibrato: StereoDelay::new(MAX_DELAY_TIME_SECONDS, DEFAULT_SAMPLE_RATE),
+
+            reverb: MoorerReverb::new(DEFAULT_SAMPLE_RATE),
 
             lpf,
             should_update_lpf,
@@ -277,6 +293,26 @@ impl CroakerParams {
 
             width: FloatParam::new("Width", 0.0, FloatRange::Linear { min: 0.0, max: 1.0 })
                 .with_smoother(SmoothingStyle::Exponential(50.0))
+                .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            reverb_dry_wet: FloatParam::new(
+                "Reverb dry/wet",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 },
+            )
+            .with_smoother(SmoothingStyle::Linear(50.0))
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            room_size: FloatParam::new("Room size", 0.5, FloatRange::Linear { min: 0.0, max: 1.0 })
+                .with_smoother(SmoothingStyle::Linear(50.0))
+                .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            damping: FloatParam::new("Damping", 0.5, FloatRange::Linear { min: 0.0, max: 1.0 })
+                .with_smoother(SmoothingStyle::Linear(50.0))
+                .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            reverb_width: FloatParam::new("Width", 0.8, FloatRange::Linear { min: 0.0, max: 1.0 })
+                .with_smoother(SmoothingStyle::Linear(50.0))
                 .with_value_to_string(formatters::v2s_f32_rounded(2)),
 
             lpf_freq: FloatParam::new(
@@ -390,10 +426,43 @@ impl Croaker {
             self.lpf.set_biquads(BiquadFilterType::LowPass, fc, q, 0.0);
         }
     }
+
+    fn update_filter_section(&mut self, sample_rate: f32) {
+        if self.params.resonance.smoothed.is_smoothing() {
+            let q = self.params.resonance.smoothed.next();
+            self.lpf.set_q(q);
+            self.hpf.set_q(q);
+        }
+        if self.params.lpf_freq.smoothed.is_smoothing() {
+            self.lpf
+                .set_fc(self.params.lpf_freq.smoothed.next() / sample_rate);
+        }
+        if self.params.hpf_freq.smoothed.is_smoothing() {
+            self.hpf
+                .set_fc(self.params.hpf_freq.smoothed.next() / sample_rate);
+        }
+    }
+
+    fn update_reverb(&mut self) {
+        let room_size_smoothed = &self.params.room_size.smoothed;
+        let damping_smoothed = &self.params.damping.smoothed;
+        let width_smoothed = &self.params.reverb_width.smoothed;
+
+        // Update reverbs while parameters smooth
+        if room_size_smoothed.is_smoothing() {
+            self.reverb.set_room_size(room_size_smoothed.next());
+        }
+        if damping_smoothed.is_smoothing() {
+            self.reverb.set_damping(damping_smoothed.next());
+        }
+        if width_smoothed.is_smoothing() {
+            self.reverb.set_width(width_smoothed.next());
+        }
+    }
 }
 
 impl Plugin for Croaker {
-    const NAME: &'static str = "croaker";
+    const NAME: &'static str = "croaker reverb test";
     const VENDOR: &'static str = "renzofrog";
     const URL: &'static str = "https://www.renzofrog.com";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
@@ -444,6 +513,10 @@ impl Plugin for Croaker {
         } else {
             self.oversample_factor = OVERSAMPLING_FACTOR;
         }
+
+        self.reverb
+            .generate_filters(_buffer_config.sample_rate as usize);
+        self.update_reverb();
         true
     }
 
@@ -464,18 +537,9 @@ impl Plugin for Croaker {
         self.check_and_update_filter_coefficients(sample_rate);
 
         for mut channel_samples in buffer.iter_samples() {
-            // Update filter section while smoothing
-            if self.params.resonance.smoothed.is_smoothing() {
-                let q = self.params.resonance.smoothed.next();
-                self.lpf.set_q(q);
-                self.hpf.set_q(q);
-            }
-            if self.params.lpf_freq.smoothed.is_smoothing() {
-                self.lpf.set_fc(self.params.lpf_freq.smoothed.next() / sample_rate);
-            }
-            if self.params.hpf_freq.smoothed.is_smoothing() {
-                self.hpf.set_fc(self.params.hpf_freq.smoothed.next() / sample_rate);
-            }
+            // Update processors while smoothing
+            self.update_reverb();
+            self.update_filter_section(sample_rate);
 
             // Distortion parameters
             let drive = self.params.drive.smoothed.next();
@@ -570,6 +634,12 @@ impl Plugin for Croaker {
             let out_l = (in_l * (1.0 - dry_wet_ratio)) + (wet_l * dry_wet_ratio);
             let out_r = (in_r * (1.0 - dry_wet_ratio)) + (wet_r * dry_wet_ratio);
 
+            // Add reverb
+            let (reverb_l, reverb_r) = self.reverb.tick((out_l, out_r));
+            let reverb_dry_wet = self.params.reverb_dry_wet.smoothed.next();
+            let out_l = out_l * (1. - reverb_dry_wet) + reverb_l * reverb_dry_wet;
+            let out_r = out_r * (1. - reverb_dry_wet) + reverb_r * reverb_dry_wet;
+
             // Run signal through filter section
             let (out_l, out_r) = self.lpf.process((out_l, out_r));
             let (out_l, out_r) = self.hpf.process((out_l, out_r));
@@ -606,7 +676,7 @@ impl ClapPlugin for Croaker {
 }
 
 impl Vst3Plugin for Croaker {
-    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroaker";
+    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroake3";
 
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
         &[Vst3SubCategory::Fx, Vst3SubCategory::Distortion];
