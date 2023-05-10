@@ -1,4 +1,5 @@
 use atomic_float::AtomicF32;
+use fx::digital::{bitcrush_sample, floating_point_quantize};
 use fx::moorer_verb::MoorerReverb;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
@@ -25,6 +26,21 @@ const PEAK_METER_DECAY_MS: f64 = 150.0;
 const FILTER_CUTOFF_HZ: f32 = 8000.0;
 /// Multiplier to oversample by
 const OVERSAMPLING_FACTOR: usize = 4;
+/// Min number of bits for bitcrushing
+const MIN_BITS: usize = 2;
+/// Max number of bits for bitcrushing
+const MAX_BITS: usize = 32;
+/// Maximum constant value to add for floating point rounding error
+const MAX_CONSTANT: f32 = 1_000_000.;
+/// Max decimate value, because going past this value literally causes silence
+const MAX_DECIMATE_VALUE: f32 = 0.9;
+
+// TODO: rename everything here to be flanger
+// Chorus constants
+const CHORUS_LFO_RATE_HZ: f32 = 0.1;
+const CHORUS_LFO_AMOUNT: f32 = 0.03;
+const CHORUS_WIDTH: f32 = 0.03;
+const CHORUS_FEEDBACK: f32 = 0.85;
 
 #[derive(Enum, Debug, PartialEq, Eq, Clone, Copy)]
 /// Distortion algorithms available in plugin
@@ -106,6 +122,9 @@ pub struct Croaker {
     should_update_lpf: Arc<AtomicBool>,
     hpf: StereoBiquadFilter,
     should_update_hpf: Arc<AtomicBool>,
+
+    // Fun section
+    chorus: StereoDelay,
 }
 
 #[derive(Params)]
@@ -148,6 +167,13 @@ struct CroakerParams {
     pub hpf_freq: FloatParam,
     #[id = "resonance"]
     pub resonance: FloatParam,
+
+    #[id = "crush"]
+    pub decimate: FloatParam,
+    #[id = "hiss"]
+    pub crunch: FloatParam,
+    #[id = "chorus"]
+    pub chorus: FloatParam,
 
     // General parameters
     #[id = "dry-wet"]
@@ -207,6 +233,8 @@ impl Default for Croaker {
             should_update_lpf,
             hpf,
             should_update_hpf,
+
+            chorus: StereoDelay::new(MAX_DELAY_TIME_SECONDS, DEFAULT_SAMPLE_RATE),
         }
     }
 }
@@ -368,6 +396,34 @@ impl CroakerParams {
             }))
             .with_smoother(SmoothingStyle::Logarithmic(20.0))
             .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            decimate: FloatParam::new(
+                "Decimate",
+                0.0,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 1.0,
+                    factor: FloatRange::skew_factor(1.0),
+                },
+            )
+            .with_smoother(SmoothingStyle::Exponential(50.0))
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            crunch: FloatParam::new(
+                "Crunch",
+                0.0,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 1.0,
+                    factor: FloatRange::skew_factor(-1.0),
+                },
+            )
+            .with_smoother(SmoothingStyle::Exponential(50.0))
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
+
+            chorus: FloatParam::new("Flanger", 0.0, FloatRange::Linear { min: 0.0, max: 1.0 })
+                .with_smoother(SmoothingStyle::Exponential(50.0))
+                .with_value_to_string(formatters::v2s_f32_rounded(2)),
         }
     }
 }
@@ -517,6 +573,9 @@ impl Plugin for Croaker {
         self.reverb
             .generate_filters(_buffer_config.sample_rate as usize);
         self.update_reverb();
+
+        self.chorus
+            .resize_buffers(MAX_DELAY_TIME_SECONDS, _buffer_config.sample_rate as usize);
         true
     }
 
@@ -644,6 +703,39 @@ impl Plugin for Croaker {
             let (out_l, out_r) = self.lpf.process((out_l, out_r));
             let (out_l, out_r) = self.hpf.process((out_l, out_r));
 
+            // Run signal through... fun things :)
+            // Bitcrush
+            let decimate = self.params.decimate.smoothed.next();
+            let (out_l, out_r) = if decimate > 0.0 {
+                let decimate = decimate * MAX_DECIMATE_VALUE;
+                let bits = -decimate * (MAX_BITS - MIN_BITS) as f32 + MAX_BITS as f32;
+                let bitcrushed = (bitcrush_sample(out_l, bits), bitcrush_sample(out_r, bits));
+                (
+                    get_wavefolder_output(decimate, bitcrushed.0),
+                    get_wavefolder_output(decimate, bitcrushed.1),
+                )
+            } else {
+                (out_l, out_r)
+            };
+
+            // tom7's floating point addition rounding error
+            let crunch = self.params.crunch.smoothed.next();
+            let (out_l, out_r) = (
+                floating_point_quantize(out_l, crunch * MAX_CONSTANT),
+                floating_point_quantize(out_r, crunch * MAX_CONSTANT),
+            );
+
+            // Apply chorus
+            let chorus_depth = self.params.chorus.smoothed.next();
+            let (out_l, out_r) = self.chorus.process_with_chorus(
+                (out_l, out_r),
+                CHORUS_LFO_RATE_HZ,
+                CHORUS_LFO_AMOUNT,
+                CHORUS_WIDTH,
+                chorus_depth,
+                CHORUS_FEEDBACK,
+            );
+
             // Apply output gain, and update output peak meter value
             let out_l = out_l * output_gain;
             let out_r = out_r * output_gain;
@@ -672,15 +764,21 @@ impl ClapPlugin for Croaker {
         ClapFeature::AudioEffect,
         ClapFeature::Stereo,
         ClapFeature::Distortion,
+        ClapFeature::Filter,
+        ClapFeature::Reverb,
     ];
 }
 
 impl Vst3Plugin for Croaker {
     const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroaker";
 
-    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
-        &[Vst3SubCategory::Fx, Vst3SubCategory::Distortion];
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[
+        Vst3SubCategory::Fx,
+        Vst3SubCategory::Distortion,
+        Vst3SubCategory::Filter,
+        Vst3SubCategory::Reverb,
+    ];
 }
 
-// We can also export to CLAP plugin format
+nih_export_clap!(Croaker);
 nih_export_vst3!(Croaker);
