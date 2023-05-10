@@ -35,6 +35,7 @@ const MAX_CONSTANT: f32 = 1_000_000.;
 /// Max decimate value, because going past this value literally causes silence
 const MAX_DECIMATE_VALUE: f32 = 0.9;
 
+// TODO: rename everything here to be flanger
 // Chorus constants
 const CHORUS_LFO_RATE_HZ: f32 = 0.1;
 const CHORUS_LFO_AMOUNT: f32 = 0.03;
@@ -517,7 +518,7 @@ impl Croaker {
 }
 
 impl Plugin for Croaker {
-    const NAME: &'static str = "croaker fun stuff";
+    const NAME: &'static str = "croaker";
     const VENDOR: &'static str = "renzofrog";
     const URL: &'static str = "https://www.renzofrog.com";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
@@ -769,7 +770,7 @@ impl ClapPlugin for Croaker {
 }
 
 impl Vst3Plugin for Croaker {
-    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroake9";
+    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroaker";
 
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[
         Vst3SubCategory::Fx,
@@ -779,5 +780,5 @@ impl Vst3Plugin for Croaker {
     ];
 }
 
-// We can also export to CLAP plugin format
+nih_export_clap!(Croaker);
 nih_export_vst3!(Croaker);
