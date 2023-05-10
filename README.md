@@ -19,7 +19,7 @@ this project is being completed partially in fulfillment of the senior capstone 
 
 A temporary download link to standalone, VST3, and CLAP versions can be found here: [Google Drive](https://drive.google.com/drive/folders/1MUqEvY7qZCM-ucpszpEqc7d3vIfdQkVw?usp=sharing)
 
-I have only tested plugin on macOS Monterey 12.5 using Audacity and Ableton Live 11. I haven't been able to run this on Reason 12. Also, since I don't have an Apple Developer account (yet), I haven't codesigned these applications. So, you'll need to codesign yourself. Here are some useful links:
+I have only tested plugin on macOS Monterey 12.5 using Audacity and Ableton Live 11. I haven't been able to run this on Reason 12. Also, since I don't have an Apple Developer account (yet), I haven't codesigned *or* notarized these applications. So, you'll need to do that yourself. Here are some useful links:
 
 - <https://www.osirisguitar.com/how-to-make-unsigned-vsts-work-in-macos-catalina/>
 - <https://forum.cabbageaudio.com/t/how-to-codesign-osx-plugins/3079>
