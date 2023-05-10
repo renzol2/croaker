@@ -393,7 +393,7 @@ impl Croaker {
 }
 
 impl Plugin for Croaker {
-    const NAME: &'static str = "croaker filter test";
+    const NAME: &'static str = "croaker";
     const VENDOR: &'static str = "renzofrog";
     const URL: &'static str = "https://www.renzofrog.com";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
@@ -606,7 +606,7 @@ impl ClapPlugin for Croaker {
 }
 
 impl Vst3Plugin for Croaker {
-    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroake2";
+    const VST3_CLASS_ID: [u8; 16] = *b"renzofrogcroaker";
 
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
         &[Vst3SubCategory::Fx, Vst3SubCategory::Distortion];
