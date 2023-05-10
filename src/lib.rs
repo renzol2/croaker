@@ -54,7 +54,7 @@ pub enum DistortionType {
     Dropout,
 
     #[id = "double-soft-clipper"]
-    #[name = "Double soft clipper"]
+    #[name = "Double soft clip"]
     DoubleSoftClipper,
 
     #[id = "wavefolding"]
@@ -132,14 +132,14 @@ struct CroakerParams {
     pub width: FloatParam,
 
     // Reverb parameters
-    #[id = "reverb-dry-wet"]
-    pub reverb_dry_wet: FloatParam,
     #[id = "room-size"]
     pub room_size: FloatParam,
     #[id = "dampening"]
     pub damping: FloatParam,
     #[id = "reverb_width"]
     pub reverb_width: FloatParam,
+    #[id = "reverb-dry-wet"]
+    pub reverb_dry_wet: FloatParam,
 
     // Filter section parameters
     #[id = "lpf-freq"]
@@ -296,14 +296,14 @@ impl CroakerParams {
                 .with_value_to_string(formatters::v2s_f32_rounded(2)),
 
             reverb_dry_wet: FloatParam::new(
-                "Reverb dry/wet",
+                "Dry/wet",
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
             )
             .with_smoother(SmoothingStyle::Linear(50.0))
             .with_value_to_string(formatters::v2s_f32_rounded(2)),
 
-            room_size: FloatParam::new("Room size", 0.5, FloatRange::Linear { min: 0.0, max: 1.0 })
+            room_size: FloatParam::new("Room size", 0.2, FloatRange::Linear { min: 0.0, max: 1.0 })
                 .with_smoother(SmoothingStyle::Linear(50.0))
                 .with_value_to_string(formatters::v2s_f32_rounded(2)),
 

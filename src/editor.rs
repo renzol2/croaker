@@ -12,7 +12,7 @@ use crate::assets::{register_fantasque_sans_mono, FANTASQUE_SANS_MONO};
 use crate::CroakerParams;
 
 const STYLE: &str = include_str!("style.css");
-pub const WINDOW_WIDTH: u32 = 800;
+pub const WINDOW_WIDTH: u32 = 870;
 pub const WINDOW_HEIGHT: u32 = 600;
 
 #[derive(Lens)]
@@ -76,6 +76,7 @@ pub(crate) fn create(
             distortion_types: vec![
                 "Saturate".to_string(),
                 "Hard clip".to_string(),
+                "Hard clipper".to_string(),
                 "Fuzzy rectifier".to_string(),
                 "Diode rectifier".to_string(),
                 "Dropout".to_string(),
@@ -90,103 +91,145 @@ pub(crate) fn create(
         // UI
         VStack::new(cx, |cx| {
             // Title
-            Label::new(cx, "🐸🌱💫")
+            Label::new(cx, "~ 🐸🌱💫 ~")
                 .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
-                .font_size(30.0)
+                .font_size(50.0)
                 .height(Pixels(50.0))
+                .top(Pixels(10.0))
+                .bottom(Pixels(10.0))
                 .child_top(Stretch(1.0));
 
             // Effect knob sections
             HStack::new(cx, |cx| {
                 // Distortion & tape sections
                 VStack::new(cx, |cx| {
-                    // Distortion knobs
-                    Label::new(cx, "Distortion")
-                        .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
-                        .font_size(15.0)
-                        .height(Pixels(50.0))
-                        .font_weight(Weight::BOLD)
-                        .child_top(Stretch(1.0))
-                        .top(Pixels(-10.0))
-                        .bottom(Pixels(-10.0));
-                    HStack::new(cx, |cx| {
-                        // Input gain control
-                        make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
+                    VStack::new(cx, |cx| {
+                        // Distortion knobs
+                        Label::new(cx, "Distortion")
+                            .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
+                            .font_size(16.0)
+                            .height(Pixels(50.0))
+                            .font_weight(Weight::BOLD)
+                            .child_top(Stretch(1.0));
+                        HStack::new(cx, |cx| {
+                            // Input gain control
+                            make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
 
-                        // Saturation control
-                        make_knob(cx, params.shape.as_ptr(), |params| &params.shape);
+                            // Saturation control
+                            make_knob(cx, params.shape.as_ptr(), |params| &params.shape);
 
-                        // Distortion type
-                        make_knob(cx, params.distortion_type.as_ptr(), |params| {
-                            &params.distortion_type
-                        });
+                            // Distortion type
+                            make_knob(cx, params.distortion_type.as_ptr(), |params| {
+                                &params.distortion_type
+                            });
 
-                        // Output gain control
-                        make_knob(cx, params.output_gain.as_ptr(), |params| {
-                            &params.output_gain
-                        });
+                            // Output gain control
+                            make_knob(cx, params.output_gain.as_ptr(), |params| {
+                                &params.output_gain
+                            });
+                        })
+                        .child_space(Pixels(5.0))
+                        .bottom(Pixels(-10.0))
+                        .class("knobs");
                     })
-                    .child_space(Pixels(5.0))
-                    .bottom(Pixels(-10.0))
-                    .class("knobs");
+                    .child_left(Stretch(1.0))
+                    .child_right(Stretch(1.0));
 
                     // Vibrato knobs
-                    Label::new(cx, "Tape")
-                        .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
-                        .font_size(15.0)
-                        .height(Pixels(50.0))
-                        .font_weight(Weight::BOLD)
-                        .child_top(Stretch(1.0))
-                        .top(Pixels(-20.0))
-                        .bottom(Pixels(-10.0));
-                    HStack::new(cx, |cx| {
-                        // Wow control
-                        make_knob(cx, params.wow.as_ptr(), |params| &params.wow);
+                    VStack::new(cx, |cx| {
+                        Label::new(cx, "Tape")
+                            .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
+                            .font_size(16.0)
+                            .height(Pixels(50.0))
+                            .font_weight(Weight::BOLD)
+                            .child_top(Stretch(1.0))
+                            .top(Pixels(10.0));
+                        HStack::new(cx, |cx| {
+                            // Wow control
+                            make_knob(cx, params.wow.as_ptr(), |params| &params.wow);
 
-                        // Flutter control
-                        make_knob(cx, params.flutter.as_ptr(), |params| &params.flutter);
+                            // Flutter control
+                            make_knob(cx, params.flutter.as_ptr(), |params| &params.flutter);
 
-                        // Width control
-                        make_knob(cx, params.width.as_ptr(), |params| &params.width);
+                            // Width control
+                            make_knob(cx, params.width.as_ptr(), |params| &params.width);
 
-                        // Dry/wet control
-                        make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| {
-                            &params.dry_wet_ratio
-                        });
+                            // Dry/wet control
+                            make_knob(cx, params.dry_wet_ratio.as_ptr(), |params| {
+                                &params.dry_wet_ratio
+                            });
+                        })
+                        .child_space(Pixels(5.0))
+                        .class("knobs");
                     })
-                    .child_space(Pixels(4.0))
-                    .class("knobs")
-                    .bottom(Pixels(15.0));
+                    .child_left(Stretch(1.0))
+                    .child_right(Stretch(1.0));
                 });
 
-                // Filter section
+                // Reverb and filter section
                 VStack::new(cx, |cx| {
-                    // Filter knobs
-                    Label::new(cx, "Filter")
-                        .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
-                        .font_size(15.0)
-                        .height(Pixels(50.0))
-                        .font_weight(Weight::BOLD)
-                        .child_top(Stretch(1.0))
-                        .top(Pixels(-10.0))
-                        .bottom(Pixels(-10.0));
-                    HStack::new(cx, |cx| {
-                        // HPF control
-                        make_knob(cx, params.hpf_freq.as_ptr(), |params| &params.hpf_freq);
+                    VStack::new(cx, |cx| {
+                        // Reverb knobs
+                        Label::new(cx, "Reverb")
+                            .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
+                            .font_size(16.0)
+                            .height(Pixels(50.0))
+                            .font_weight(Weight::BOLD)
+                            .child_top(Stretch(1.0));
+                        HStack::new(cx, |cx| {
+                            // Room size control
+                            make_knob(cx, params.room_size.as_ptr(), |params| &params.room_size);
 
-                        // LPF control
-                        make_knob(cx, params.lpf_freq.as_ptr(), |params| &params.lpf_freq);
+                            // Damping control
+                            make_knob(cx, params.damping.as_ptr(), |params| &params.damping);
 
-                        // Resonance control
-                        make_knob(cx, params.resonance.as_ptr(), |params| &params.resonance);
+                            // Reverb width control
+                            make_knob(cx, params.reverb_width.as_ptr(), |params| {
+                                &params.reverb_width
+                            });
+
+                            // Reverb dry/wet control
+                            make_knob(cx, params.reverb_dry_wet.as_ptr(), |params| {
+                                &params.reverb_dry_wet
+                            });
+                        })
+                        .child_space(Pixels(5.0))
+                        .bottom(Pixels(-10.0))
+                        .class("knobs");
                     })
-                    .child_space(Pixels(5.0))
-                    .bottom(Pixels(-10.0))
-                    .class("knobs");
+                    .child_left(Stretch(1.0))
+                    .child_right(Stretch(1.0));
+
+                    // Filter knobs
+                    VStack::new(cx, |cx| {
+                        Label::new(cx, "Filter")
+                            .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
+                            .font_size(16.0)
+                            .height(Pixels(50.0))
+                            .font_weight(Weight::BOLD)
+                            .child_top(Stretch(1.0))
+                            .top(Pixels(10.0));
+                        HStack::new(cx, |cx| {
+                            // HPF control
+                            make_knob(cx, params.hpf_freq.as_ptr(), |params| &params.hpf_freq);
+
+                            // LPF control
+                            make_knob(cx, params.lpf_freq.as_ptr(), |params| &params.lpf_freq);
+
+                            // Resonance control
+                            make_knob(cx, params.resonance.as_ptr(), |params| &params.resonance);
+                        })
+                        .child_space(Pixels(5.0))
+                        .class("knobs");
+                    })
+                    .child_left(Stretch(1.0))
+                    .child_right(Stretch(1.0));
                 });
             })
-            .col_between(Pixels(10.));
+            .col_between(Pixels(20.))
+            .top(Pixels(-10.));
 
+            // Meters and bypass
             HStack::new(cx, |cx| {
                 // Meters
                 VStack::new(cx, |cx| {
@@ -247,6 +290,7 @@ pub(crate) fn create(
                 .class("bypass");
             })
             .display(Display::Flex)
+            .top(Pixels(20.))
             .col_between(Pixels(10.0));
 
             Label::new(cx, "croaker is a renzofrog plugin. handle with care 💜")
@@ -276,6 +320,7 @@ where
             cx,
             Data::params.map(move |params| params_to_param(params).name().to_owned()),
         )
+        .font_style(FontStyle::Italic)
         .bottom(Pixels(5.0));
 
         // Units
