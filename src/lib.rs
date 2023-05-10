@@ -270,7 +270,7 @@ impl Croaker {
 }
 
 impl Plugin for Croaker {
-    const NAME: &'static str = "croaker w/ vibrato test";
+    const NAME: &'static str = "croaker";
     const VENDOR: &'static str = "renzofrog";
     const URL: &'static str = "https://www.renzofrog.com";
     const EMAIL: &'static str = "renzomledesma@gmail.com";
