@@ -69,3 +69,7 @@ knob .track {
   background-color: #ddd6be;
   border-radius: 10px;
 }
+
+knob .accent {
+  background-color: #D60270;
+}

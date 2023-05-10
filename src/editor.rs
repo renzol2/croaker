@@ -13,7 +13,7 @@ use crate::CroakerParams;
 
 const STYLE: &str = include_str!("style.css");
 pub const WINDOW_WIDTH: u32 = 870;
-pub const WINDOW_HEIGHT: u32 = 600;
+pub const WINDOW_HEIGHT: u32 = 640;
 
 #[derive(Lens)]
 struct Data {
@@ -107,7 +107,7 @@ pub(crate) fn create(
                         // Distortion knobs
                         Label::new(cx, "Distortion")
                             .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
-                            .font_size(16.0)
+                            .font_size(20.0)
                             .height(Pixels(50.0))
                             .font_weight(Weight::BOLD)
                             .child_top(Stretch(1.0));
@@ -122,11 +122,6 @@ pub(crate) fn create(
                             make_knob(cx, params.distortion_type.as_ptr(), |params| {
                                 &params.distortion_type
                             });
-
-                            // Output gain control
-                            make_knob(cx, params.output_gain.as_ptr(), |params| {
-                                &params.output_gain
-                            });
                         })
                         .child_space(Pixels(5.0))
                         .bottom(Pixels(-10.0))
@@ -139,7 +134,7 @@ pub(crate) fn create(
                     VStack::new(cx, |cx| {
                         Label::new(cx, "Tape")
                             .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
-                            .font_size(16.0)
+                            .font_size(20.0)
                             .height(Pixels(50.0))
                             .font_weight(Weight::BOLD)
                             .child_top(Stretch(1.0))
@@ -164,7 +159,8 @@ pub(crate) fn create(
                     })
                     .child_left(Stretch(1.0))
                     .child_right(Stretch(1.0));
-                });
+                })
+                .row_between(Pixels(-15.0));
 
                 // Reverb and filter section
                 VStack::new(cx, |cx| {
@@ -172,7 +168,7 @@ pub(crate) fn create(
                         // Reverb knobs
                         Label::new(cx, "Reverb")
                             .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
-                            .font_size(16.0)
+                            .font_size(20.0)
                             .height(Pixels(50.0))
                             .font_weight(Weight::BOLD)
                             .child_top(Stretch(1.0));
@@ -204,7 +200,7 @@ pub(crate) fn create(
                     VStack::new(cx, |cx| {
                         Label::new(cx, "Filter")
                             .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
-                            .font_size(16.0)
+                            .font_size(20.0)
                             .height(Pixels(50.0))
                             .font_weight(Weight::BOLD)
                             .child_top(Stretch(1.0))
@@ -224,74 +220,112 @@ pub(crate) fn create(
                     })
                     .child_left(Stretch(1.0))
                     .child_right(Stretch(1.0));
-                });
+                })
+                .row_between(Pixels(-15.0));
             })
-            .col_between(Pixels(20.))
-            .top(Pixels(-10.));
+            .col_between(Pixels(30.))
+            .top(Pixels(-20.));
 
-            // Meters and bypass
+            // Fun knobs, meters, and bypass
             HStack::new(cx, |cx| {
-                // Meters
+                // Fun knobs
                 VStack::new(cx, |cx| {
-                    // Input gain
-                    VStack::new(cx, |cx| {
-                        // Input gain label
-                        Label::new(cx, "Input level").font_size(15.0);
+                    Label::new(cx, "uh oh 😵")
+                        .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
+                        .font_size(20.0)
+                        .height(Pixels(50.0))
+                        .font_weight(Weight::BOLD)
+                        .child_top(Stretch(1.0))
+                        .top(Pixels(0.0))
+                        .bottom(Pixels(-40.0));
+                    HStack::new(cx, |cx| {
+                        // Crunch control
+                        make_accent_knob(cx, params.crunch.as_ptr(), |params| &params.crunch);
 
-                        // Input gain meter
-                        PeakMeter::new(
-                            cx,
-                            Data::input_peak_meter.map(|input_peak_meter| {
-                                util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
-                            }),
-                            Some(Duration::from_millis(600)),
-                        );
+                        // Decimate control
+                        make_accent_knob(cx, params.decimate.as_ptr(), |params| &params.decimate);
+
+                        // Chorus control
+                        make_accent_knob(cx, params.chorus.as_ptr(), |params| &params.chorus);
+
+                        // Output gain control
+                        make_knob(cx, params.output_gain.as_ptr(), |params| {
+                            &params.output_gain
+                        });
                     })
-                    .col_between(Pixels(7.0))
-                    .top(Pixels(0.0))
-                    .bottom(Pixels(-20.0)); // meters can be a little closer
-
-                    // Output gain
-                    VStack::new(cx, |cx| {
-                        // Output gain label
-                        Label::new(cx, "Output level").font_size(15.0);
-
-                        // Output gain meter
-                        PeakMeter::new(
-                            cx,
-                            Data::output_peak_meter.map(|peak_meter| {
-                                util::gain_to_db(peak_meter.load(Ordering::Relaxed))
-                            }),
-                            Some(Duration::from_millis(600)),
-                        );
-                    })
-                    .child_space(Pixels(10.0))
-                    .bottom(Pixels(10.0));
+                    .child_space(Pixels(5.0))
+                    .class("knobs");
                 })
                 .child_left(Stretch(1.0))
                 .child_right(Stretch(1.0))
-                .class("gain_meters");
+                .top(Pixels(-50.));
 
-                // Bypass button
-                Button::new(
-                    cx,
-                    |cx| {
-                        // FIXME: doing it this way causes a debug assertion error.
-                        // not sure how to fix this, but it's not breaking anything major...
-                        cx.emit(ParamChangeEvent::SetParam(
-                            Data::params.get(cx).bypass.as_ptr(),
-                            // We pass the opposite value of the current state as a float, because parameter is a float
-                            !Data::params.get(cx).bypass.value() as i32 as f32,
-                        ));
-                    },
-                    |cx| Label::new(cx, "Bypass"),
-                )
-                .top(Pixels(42.0))
-                .class("bypass");
+                // Meters and bypass button
+                HStack::new(cx, |cx| {
+                    // Meters
+                    VStack::new(cx, |cx| {
+                        // Input gain
+                        VStack::new(cx, |cx| {
+                            // Input gain label
+                            Label::new(cx, "Input level").font_size(15.0);
+
+                            // Input gain meter
+                            PeakMeter::new(
+                                cx,
+                                Data::input_peak_meter.map(|input_peak_meter| {
+                                    util::gain_to_db(input_peak_meter.load(Ordering::Relaxed))
+                                }),
+                                Some(Duration::from_millis(600)),
+                            );
+                        })
+                        .col_between(Pixels(7.0))
+                        .top(Pixels(0.0))
+                        .bottom(Pixels(-50.0)); // meters can be a little closer
+
+                        // Output gain
+                        VStack::new(cx, |cx| {
+                            // Output gain label
+                            Label::new(cx, "Output level").font_size(15.0);
+
+                            // Output gain meter
+                            PeakMeter::new(
+                                cx,
+                                Data::output_peak_meter.map(|peak_meter| {
+                                    util::gain_to_db(peak_meter.load(Ordering::Relaxed))
+                                }),
+                                Some(Duration::from_millis(600)),
+                            );
+                        })
+                        .child_space(Pixels(10.0))
+                        .bottom(Pixels(10.0));
+                    })
+                    .child_left(Stretch(1.0))
+                    .child_right(Stretch(1.0))
+                    .class("gain_meters");
+
+                    // Bypass button
+                    Button::new(
+                        cx,
+                        |cx| {
+                            // FIXME: doing it this way causes a debug assertion error.
+                            // not sure how to fix this, but it's not breaking anything major...
+                            cx.emit(ParamChangeEvent::SetParam(
+                                Data::params.get(cx).bypass.as_ptr(),
+                                // We pass the opposite value of the current state as a float, because parameter is a float
+                                !Data::params.get(cx).bypass.value() as i32 as f32,
+                            ));
+                        },
+                        |cx| Label::new(cx, "Bypass"),
+                    )
+                    .top(Pixels(50.0))
+                    .class("bypass");
+                })
+                .col_between(Pixels(15.));
             })
             .display(Display::Flex)
-            .top(Pixels(20.))
-            .col_between(Pixels(10.0));
+            .top(Pixels(40.))
+            .bottom(Pixels(20.))
+            .col_between(Pixels(60.0));
 
             Label::new(cx, "croaker is a renzofrog plugin. handle with care 💜")
                 .font_family(vec![FamilyOwned::Name(String::from(FANTASQUE_SANS_MONO))])
@@ -357,6 +391,88 @@ where
                 )
                 .value(lens)
                 .class("track")
+            },
+        )
+        .on_changing(move |cx, val| {
+            cx.emit(
+                // setter.set_parameter_normalized(param, val);
+                // ParamChangeEvent::AllParams(param_index, val),
+                ParamChangeEvent::SetParam(param_ptr, val),
+            )
+        })
+        .on_mouse_down(move |cx, _| {
+            cx.emit(
+                // setter.set_parameter_normalized(param, val);
+                ParamChangeEvent::BeginSet(param_ptr),
+            )
+        })
+        .on_mouse_up(move |cx, _| {
+            cx.emit(
+                // setter.set_parameter_normalized(param, val);
+                ParamChangeEvent::EndSet(param_ptr),
+            )
+        });
+    })
+    .child_space(Stretch(0.1))
+    .child_left(Stretch(1.0))
+    .child_right(Stretch(1.0))
+    .width(Pixels(90.))
+}
+
+// This is the same function as above, but with a different color
+// TODO: figure out how to generalize class name
+fn make_accent_knob<P, F>(
+    cx: &mut Context,
+    param_ptr: ParamPtr,
+    params_to_param: F,
+) -> Handle<VStack>
+where
+    P: Param,
+    F: 'static + Fn(&Arc<CroakerParams>) -> &P + Copy,
+{
+    VStack::new(cx, move |cx| {
+        // Param name
+        Label::new(
+            cx,
+            Data::params.map(move |params| params_to_param(params).name().to_owned()),
+        )
+        .font_style(FontStyle::Italic)
+        .bottom(Pixels(2.0));
+
+        // Units
+        Label::new(
+            cx,
+            Data::params.map(move |params| params_to_param(params).to_string()),
+        )
+        .font_size(11.0);
+
+        // Knob
+        Knob::custom(
+            cx,
+            0.5,
+            Data::params.map(move |params| params_to_param(params).modulated_normalized_value()),
+            move |cx, lens| {
+                TickKnob::new(
+                    cx,
+                    Percentage(80.0),
+                    Pixels(4.),
+                    Percentage(50.0),
+                    270.0,
+                    KnobMode::Continuous,
+                )
+                .value(lens.clone())
+                .class("tick");
+                ArcTrack::new(
+                    cx,
+                    false,
+                    Percentage(100.0),
+                    Percentage(10.),
+                    -135.,
+                    135.,
+                    KnobMode::Continuous,
+                )
+                .value(lens)
+                .class("accent")
             },
         )
         .on_changing(move |cx, val| {
