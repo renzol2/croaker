@@ -39,5 +39,7 @@ This project is licensed under the GNU General Public License Version 3 or later
 
 Code that is copied or translated from other sources will be noted in the source code.
 
+The font, [Fantasque Sans Mono](https://github.com/belluzj/fantasque-sans), is licensed under the SIL Open Font License.
+
 (If there is an issue with licensing, please contact me at renzomledesma@gmail.com)
 
